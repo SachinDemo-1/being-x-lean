@@ -1,0 +1,113 @@
+.pricing-page { min-height: 100vh; position: relative; }
+.pricing-header { position: relative; padding: 5rem 2rem 3rem; text-align: center; overflow: hidden; }
+.ph-bg { position: absolute; inset: 0; background: radial-gradient(ellipse at center top, rgba(255,215,0,0.08) 0%, transparent 60%); }
+.ph-inner { position: relative; z-index: 1; }
+.rzp-badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 6px 20px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 30px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 1rem; letter-spacing: 0.1em; color: #3395ff; margin-bottom: 1.5rem; }
+.pricing-title { font-family: 'Bebas Neue', cursive; font-size: clamp(2.5rem, 7vw, 5rem); letter-spacing: 0.05em; color: var(--text-primary); margin-bottom: 1rem; }
+.pricing-title-accent { color: var(--accent); }
+.pricing-trust { display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600; }
+
+.pricing-cards-wrap { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; max-width: 1050px; margin: 0 auto; padding: 0 2rem 3rem; align-items: start; }
+
+.pricing-card {
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 2rem 1.5rem;
+  text-align: center;
+  position: relative;
+  transition: all 0.3s ease;
+  display: flex; flex-direction: column; align-items: center; gap: 0.75rem;
+}
+.pricing-card:hover { transform: translateY(-6px); border-color: var(--plan-color); box-shadow: 0 20px 40px rgba(0,0,0,0.3), 0 0 40px color-mix(in srgb, var(--plan-color) 15%, transparent); }
+
+.pricing-card-best {
+  background: linear-gradient(180deg, #1a1000 0%, #120d00 100%);
+  border-color: #ffd700;
+  box-shadow: 0 0 40px rgba(255,215,0,0.15);
+}
+.best-value-badge { position: absolute; top: -1px; right: 1.5rem; background: linear-gradient(135deg, #ffd700, #ff8c00); color: #000; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 4px 14px; border-radius: 0 0 10px 10px; }
+
+.pc-icon-wrap { width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.pc-icon { font-size: 2rem; }
+.pc-title { font-family: 'Bebas Neue', cursive; font-size: 1.5rem; letter-spacing: 0.1em; color: var(--text-primary); }
+.pc-subtitle { font-family: 'Bebas Neue', cursive; font-size: 1.3rem; letter-spacing: 0.05em; text-align: center; }
+.pc-divider { height: 2px; width: 40px; border-radius: 2px; }
+
+.pc-features { list-style: none; text-align: left; width: 100%; display: flex; flex-direction: column; gap: 0.5rem; }
+.pc-feature { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-secondary); }
+.pc-check { font-size: 0.8rem; flex-shrink: 0; }
+
+.pc-price-wrap { width: 100%; }
+.pc-original { font-family: 'Barlow Condensed', sans-serif; font-size: 1.2rem; color: var(--text-secondary); text-decoration: line-through; margin-bottom: 0.5rem; }
+.pc-price { font-family: 'Bebas Neue', cursive; font-size: 1rem; letter-spacing: 0.05em; color: white; padding: 8px 24px; border-radius: 12px; display: inline-block; }
+.pc-only { font-size: 1rem; opacity: 0.9; }
+
+.pc-buy-btn { width: 100%; padding: 14px; border: none; border-radius: var(--radius); color: white; font-family: 'Barlow Condensed', sans-serif; font-size: 1.1rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: all 0.2s ease; }
+.pc-buy-btn:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.1); }
+.pc-buy-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+.pc-trust { font-size: 0.72rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.3rem; }
+
+.pricing-security { display: flex; justify-content: center; gap: 2rem; padding: 1.5rem 2rem 3rem; flex-wrap: wrap; color: var(--text-secondary); font-size: 0.8rem; font-weight: 600; border-top: 1px solid var(--border); max-width: 600px; margin: 0 auto; }
+
+@media (max-width: 900px) { .pricing-cards-wrap { grid-template-columns: 1fr; max-width: 420px; } }
+@media (max-width: 640px) { .pricing-trust { gap: 1rem; flex-direction: column; align-items: center; } .pricing-security { flex-direction: column; align-items: center; gap: 0.75rem; } }
+
+
+
+
+
+
+
+/* Card must be relative */
+.pricing-card {
+    position: relative;
+    overflow: hidden;
+}
+
+/* Overlay */
+.locked-card-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(120, 120, 120, 0.45); /* Grey transparent */
+    backdrop-filter: blur(1px);
+    -webkit-backdrop-filter: blur(6px);
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    z-index: 100;
+    border-radius: inherit;
+}
+
+/* Lock Badge */
+.locked-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    padding: 18px 28px;
+    border-radius: 18px;
+
+    background: rgba(35, 35, 35, 0.85);
+    border: 1px solid rgba(255,255,255,0.15);
+
+    color: #fff;
+
+    box-shadow: 0 8px 25px rgba(0,0,0,.35);
+}
+
+/* Lock icon */
+.lock-icon {
+    font-size: 42px;
+    margin-bottom: 8px;
+}
+
+/* Text */
+.locked-badge span {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: .5px;
+}

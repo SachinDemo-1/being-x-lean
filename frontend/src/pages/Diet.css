@@ -1,0 +1,265 @@
+.diet-page { min-height: 100vh; position: relative; }
+
+/* Hero */
+.diet-hero { position:relative; padding:5rem 2rem 3rem; text-align:center; overflow:hidden; }
+.diet-orb-bg { position:absolute; inset:0; pointer-events:none; }
+.diet-orb { position:absolute; border-radius:50%; filter:blur(80px); opacity:0.18; }
+.diet-orb-1 { width:400px;height:400px; background:var(--accent); top:-100px;left:-100px; }
+.diet-orb-2 { width:350px;height:350px; background:var(--accent2); bottom:-100px;right:-50px; }
+.diet-hero-content { position:relative; z-index:1; animation:fadeInUp 0.7s ease both; }
+
+.diet-reveal { opacity:0; transform:translateY(24px); transition:opacity 0.6s ease, transform 0.6s ease; }
+.diet-reveal.visible { opacity:1; transform:translateY(0); }
+
+/* Goal Selector */
+.goal-selector-section { padding:4rem 2rem; }
+.goal-selector-inner { max-width:1100px; margin:0 auto; }
+.goal-question { text-align:center; margin-bottom:2.5rem; }
+.goal-question h2 { font-family:'Bebas Neue',cursive; font-size:2.5rem; color:var(--text-primary); margin-bottom:0.5rem; }
+.goal-question p { color:var(--text-secondary); font-size:1rem; }
+
+.goal-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:1.5rem; }
+.goal-card {
+  background:var(--bg-card); border:2px solid var(--border);
+  border-radius:var(--radius-lg); padding:2rem; cursor:pointer;
+  transition:all 0.35s ease; display:flex; flex-direction:column; gap:1rem;
+}
+.goal-card:hover { transform:translateY(-8px); }
+.goal-card.selected { }
+.goal-emoji { font-size:3rem; display:block; }
+.goal-title { font-family:'Bebas Neue',cursive; font-size:2rem; letter-spacing:0.03em; }
+.goal-desc { color:var(--text-secondary); font-size:0.9rem; line-height:1.6; }
+.goal-tips { display:flex; flex-direction:column; gap:0.4rem; }
+.goal-tip { font-size:0.8rem; color:var(--text-secondary); }
+.goal-btn { width:100%; justify-content:center; margin-top:0.5rem; box-shadow:none; }
+
+/* Diet Content */
+.diet-content { animation:fadeInUp 0.5s ease; }
+.diet-content-header {
+  border-top:1px solid; border-bottom:1px solid;
+  background:var(--bg-secondary); padding:2rem;
+  transition:border-color 0.4s;
+}
+.diet-content-inner { max-width:1100px; margin:0 auto; padding:0 2rem; }
+.diet-goal-title { font-family:'Bebas Neue',cursive; font-size:2rem; letter-spacing:0.03em; }
+.change-goal-btn { margin-left:auto; }
+.goal-tips-row { display:flex; flex-wrap:wrap; gap:0.75rem; margin-top:1.5rem; }
+.goal-tip-card { display:flex; align-items:flex-start; gap:0.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:0.6rem 1rem; font-size:0.83rem; color:var(--text-secondary); flex:1; min-width:200px; }
+.goal-tip-check { font-size:1rem; flex-shrink:0; font-weight:700; }
+
+/* Calculator */
+.calc-section {
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:var(--radius-lg); padding:2rem;
+  margin:2rem 0;
+}
+.calc-title { font-family:'Bebas Neue',cursive; font-size:2rem; margin-bottom:0.4rem; }
+.calc-subtitle { color:var(--text-secondary); font-size:0.9rem; margin-bottom:1.5rem; line-height:1.5; }
+.calc-form {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:1rem; margin-bottom:1.5rem;
+}
+.calc-group-wide { grid-column:1/-1; }
+.calc-group { display:flex; flex-direction:column; gap:0.4rem; }
+.calc-group label { font-family:'Barlow Condensed',sans-serif; font-size:0.8rem; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-secondary); }
+.calc-group input, .calc-group select {
+  background:var(--bg-secondary); border:1px solid var(--border);
+  border-radius:var(--radius); padding:10px 14px; color:var(--text-primary);
+  font-family:'Barlow',sans-serif; font-size:0.95rem; outline:none; transition:border-color 0.2s;
+}
+.calc-group input:focus, .calc-group select:focus { border-color:var(--accent); }
+.calc-group input::placeholder { color:var(--text-secondary); opacity:0.5; }
+.calc-btn { margin-top:0.5rem; }
+
+.calc-results {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:1rem; margin-top:1.5rem;
+  animation:fadeInUp 0.4s ease;
+}
+.calc-result-card {
+  background:var(--bg-secondary); border:1px solid var(--border);
+  border-radius:var(--radius); padding:1.25rem; text-align:center;
+}
+.calc-result-num { font-family:'Bebas Neue',cursive; font-size:2.8rem; line-height:1; }
+.calc-result-unit { font-size:0.75rem; color:var(--text-secondary); display:block; }
+.calc-result-label { font-family:'Barlow Condensed',sans-serif; font-size:0.85rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-top:0.3rem; color:var(--text-primary); }
+.calc-result-note { font-size:0.72rem; color:var(--text-secondary); margin-top:0.2rem; }
+
+/* Meal Plan */
+.meal-plan-section { padding:2rem 0 4rem; }
+.meal-type-tabs { display:flex; gap:0; background:var(--bg-secondary); border-radius:var(--radius); padding:4px; margin-bottom:1.5rem; overflow-x:auto; max-width:500px; }
+.meal-tab {
+  flex:1; min-width:100px; padding:10px 8px; background:none; border:none;
+  border-radius:calc(var(--radius) - 2px); cursor:pointer;
+  font-family:'Barlow Condensed',sans-serif; font-size:0.9rem; font-weight:700;
+  text-transform:uppercase; color:var(--text-secondary); transition:all 0.2s;
+  display:flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap;
+}
+.meal-tab.active { background:var(--gradient); color:white; box-shadow:var(--glow); }
+.meal-section-header { display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap; }
+.meal-section-title { font-family:'Barlow Condensed',sans-serif; font-size:1.3rem; font-weight:700; text-transform:uppercase; }
+
+.meal-cards-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:1.25rem; }
+.meal-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; transition:all 0.3s ease; }
+.meal-card:hover { transform:translateY(-4px); box-shadow:var(--glow); border-color:var(--accent); }
+.meal-card-header { padding:1.25rem 1.25rem 1rem; border-bottom:1px solid; }
+.meal-name { font-family:'Barlow Condensed',sans-serif; font-size:1.1rem; font-weight:700; text-transform:uppercase; margin-bottom:0.75rem; }
+.meal-macros { display:flex; flex-wrap:wrap; gap:6px; }
+.macro-badge { padding:3px 8px; border-radius:50px; font-size:0.7rem; font-weight:700; font-family:'Barlow Condensed',sans-serif; letter-spacing:0.04em; }
+.macro-cal { background:rgba(255,69,0,0.15); color:#ff6b35; border:1px solid rgba(255,69,0,0.3); }
+.macro-p { background:rgba(0,191,255,0.15); color:#00bfff; border:1px solid rgba(0,191,255,0.3); }
+.macro-c { background:rgba(255,215,0,0.15); color:#ffd700; border:1px solid rgba(255,215,0,0.3); }
+.macro-f { background:rgba(57,255,20,0.15); color:#39ff14; border:1px solid rgba(57,255,20,0.3); }
+.meal-card-body { padding:1.25rem; }
+.ingredients-label { font-family:'Barlow Condensed',sans-serif; font-size:0.8rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-secondary); margin-bottom:0.75rem; }
+.ingredients-list { list-style:none; display:flex; flex-direction:column; gap:0.4rem; }
+.ingredients-list li { font-size:0.85rem; color:var(--text-secondary); display:flex; align-items:center; gap:0.5rem; line-height:1.4; }
+.ingredients-list li::before { content:'•'; color:var(--accent); font-size:1rem; flex-shrink:0; }
+
+@media (max-width:600px) {
+  .goal-cards { grid-template-columns:1fr; }
+  .calc-form { grid-template-columns:1fr 1fr; }
+  .calc-group-wide { grid-column:1/-1; }
+  .meal-cards-grid { grid-template-columns:1fr; }
+  .diet-content-inner { padding:0 1rem; }
+}
+
+/* ─── Bottom Nav ─────────────────────────────────────────────── */
+.diet-bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--bg-secondary); border-top: 1px solid var(--border);
+  display: flex; z-index: 500; height: 68px;
+}
+.diet-nav-tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; background: none; border: none;
+  cursor: pointer; padding: 8px 4px; gap: 4px;
+  position: relative; transition: background 0.2s; color: var(--text-secondary);
+}
+.diet-nav-tab.active { background: var(--bg-card); color: var(--accent); }
+.diet-nav-tab:hover:not(.active) { background: var(--bg-card); }
+.diet-nav-icon { font-size: 20px; line-height: 1; }
+.diet-nav-label { font-size: 10px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+.diet-nav-indicator { position: absolute; top: 0; left: 20%; right: 20%; height: 2px; background: var(--gradient); border-radius: 0 0 3px 3px; }
+.diet-main-content { min-height: calc(100vh - 68px); }
+
+/* ─── Standard Plan ──────────────────────────────────────────── */
+.diet-standard-view { padding: 3rem 2rem 2rem; max-width: 1100px; margin: 0 auto; }
+.diet-standard-header { text-align: center; margin-bottom: 3rem; }
+.diet-standard-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 1.25rem; margin-bottom: 3rem; }
+.diet-std-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: 1.75rem; display: flex; flex-direction: column; gap: 0.5rem; transition: transform 0.3s;
+}
+.diet-std-card:hover { transform: translateY(-6px); }
+.diet-std-row { display: flex; justify-content: space-between; font-size: 0.85rem; border-bottom: 1px solid var(--border); padding: 0.4rem 0; color: var(--text-secondary); }
+.diet-std-row b { color: var(--text-primary); }
+.diet-protein-table { margin-bottom: 2rem; }
+.diet-table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+.diet-table-wrap table { width: 100%; border-collapse: collapse; }
+.diet-table-wrap th { background: var(--bg-secondary); color: var(--accent); padding: 10px 14px; text-align: left; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+.diet-table-wrap td { color: var(--text-secondary); padding: 10px 14px; font-size: 0.88rem; border-bottom: 1px solid var(--border); }
+.diet-table-wrap tr:last-child td { border-bottom: none; }
+.diet-table-wrap tr:hover td { background: var(--bg-card); }
+.diet-tips-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.diet-tip-pill { display: flex; align-items: center; gap: 0.6rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 50px; padding: 0.5rem 1rem; font-size: 0.83rem; color: var(--text-secondary); flex: 1; min-width: 200px; }
+
+/* ─── Dynamic Plan ───────────────────────────────────────────── */
+.diet-dynamic-view { padding: 2.5rem 2rem 2rem; max-width: 800px; margin: 0 auto; }
+.diet-dynamic-hero { display: flex; justify-content: space-between; align-items: flex-start; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 2rem; }
+.diet-macro-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem; }
+.diet-macro-chip { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; text-align: center; }
+.diet-meals-list { display: flex; flex-direction: column; gap: 1.25rem; }
+.diet-meal-block { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+.diet-meal-block-header { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.25rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); }
+.diet-meal-num { font-family: 'Bebas Neue', cursive; font-size: 2rem; color: var(--accent); min-width: 40px; line-height: 1; }
+.diet-meal-block-name { font-family: 'Barlow Condensed', sans-serif; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; color: var(--text-primary); }
+.diet-meal-block-time { color: var(--accent); font-size: 0.8rem; margin-top: 2px; }
+.diet-meal-block-items { padding: 0.75rem 1.25rem; }
+.diet-meal-row { display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+.diet-meal-row:last-child { border-bottom: none; }
+.diet-meal-row span:first-child { color: var(--text-secondary); }
+.diet-meal-qty { font-weight: 700; color: var(--accent); background: var(--bg-secondary); padding: 2px 10px; border-radius: 6px; font-size: 0.85rem; }
+.diet-meal-block-macros { display: grid; grid-template-columns: repeat(4,1fr); border-top: 1px solid var(--border); }
+.diet-meal-macro-chip { display: flex; flex-direction: column; align-items: center; padding: 0.6rem; gap: 2px; font-size: 0.8rem; border-right: 1px solid var(--border); }
+.diet-meal-macro-chip:last-child { border-right: none; }
+.diet-meal-macro-chip span { color: var(--text-secondary); font-size: 0.7rem; }
+
+/* ─── Empty State ────────────────────────────────────────────── */
+.diet-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 70vh; padding: 2rem; text-align: center; }
+
+/* ─── Survey Modal ───────────────────────────────────────────── */
+.diet-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; align-items: flex-end; justify-content: center; }
+.diet-modal { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 20px 20px 0 0; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; }
+.diet-modal-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 1.5rem 1.5rem 0; }
+.diet-modal-eyebrow { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.15em; color: var(--accent); margin-bottom: 4px; }
+.diet-modal-title { font-family: 'Bebas Neue', cursive; font-size: 1.8rem; color: var(--text-primary); margin: 0; }
+.diet-modal-close { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-secondary); width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-size: 13px; }
+.diet-modal-steps { display: flex; align-items: center; gap: 1rem; padding: 1.25rem 1.5rem 0; }
+.diet-step-dot { width: 28px; height: 28px; border-radius: 50%; background: var(--bg-card); border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--text-secondary); transition: all 0.3s; }
+.diet-step-dot.active { border-color: var(--accent); color: var(--accent); }
+.diet-step-dot.done { background: var(--accent); border-color: var(--accent); color: #000; }
+.diet-modal-body { padding: 1.25rem 1.5rem; }
+.diet-modal-step-title { font-family: 'Barlow Condensed', sans-serif; font-size: 1.2rem; font-weight: 700; text-transform: uppercase; color: var(--text-primary); margin-bottom: 1.25rem; }
+.diet-survey-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.diet-survey-group { display: flex; flex-direction: column; gap: 0.4rem; }
+.diet-survey-group label { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-secondary); }
+.diet-survey-group input, .diet-survey-group select { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; color: var(--text-primary); font-size: 0.95rem; outline: none; transition: border-color 0.2s; }
+.diet-survey-group input:focus, .diet-survey-group select:focus { border-color: var(--accent); }
+.diet-radio-group { display: flex; gap: 0.75rem; }
+.diet-radio-btn { flex: 1; padding: 10px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-secondary); cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; }
+.diet-radio-btn.active { border-color: var(--accent); color: var(--accent); background: var(--bg-secondary); }
+.diet-pref-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.diet-pref-card { background: var(--bg-card); border: 2px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem 1rem; cursor: pointer; text-align: center; transition: all 0.2s; }
+.diet-pref-card.active { border-color: var(--accent); background: var(--bg-secondary); }
+.diet-pref-label { color: var(--text-primary); font-weight: 700; margin-top: 0.5rem; font-size: 0.95rem; }
+.diet-pref-desc { color: var(--text-secondary); font-size: 0.78rem; margin-top: 0.25rem; }
+.diet-modal-footer { display: flex; justify-content: flex-end; gap: 0.75rem; padding: 1rem 1.5rem 1.5rem; border-top: 1px solid var(--border); }
+.diet-btn-back { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-secondary); padding: 10px 20px; border-radius: var(--radius); cursor: pointer; font-weight: 600; }
+.diet-btn-next { background: var(--gradient); color: white; border: none; padding: 10px 24px; border-radius: var(--radius); cursor: pointer; font-weight: 700; font-size: 0.95rem; }
+.diet-btn-next:disabled { opacity: 0.4; cursor: not-allowed; }
+.diet-btn-generate { background: var(--gradient); color: white; border: none; padding: 10px 24px; border-radius: var(--radius); cursor: pointer; font-weight: 700; font-size: 0.95rem; box-shadow: var(--glow); }
+.diet-btn-generate:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+
+@media (max-width: 600px) {
+  .diet-macro-bar { grid-template-columns: repeat(2,1fr); }
+  .diet-survey-grid { grid-template-columns: 1fr; }
+  .diet-standard-cards { grid-template-columns: 1fr; }
+  .diet-dynamic-hero { flex-direction: column; }
+  .diet-bottom-nav { height: 62px; }
+}
+
+
+
+.locked-card-overlay{
+    position:absolute;
+    inset:0;
+    background:rgba(114, 114, 114, 0.75);
+    backdrop-filter:blur(1px);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    border-radius:16px;
+    z-index:10;
+}
+
+.locked-card-content{
+    text-align:center;
+    color:#fff;
+    padding:20px;
+}
+
+.locked-icon{
+    font-size:48px;
+    margin-bottom:10px;
+}
+
+.locked-badge{
+    display:inline-block;
+    margin-top:15px;
+    background:#ff6a00;
+    color:#fff;
+    padding:8px 18px;
+    border-radius:20px;
+    font-weight:600;
+}

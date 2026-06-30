@@ -1,0 +1,350 @@
+/* ── GALLERY SECTION ── */
+.gallery-section {
+  padding: 60px 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.gallery-header {
+  text-align: center;
+  margin-bottom: 40px;
+  padding: 0 24px;
+}
+
+.gallery-title {
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 10px;
+  animation: glowText 2s ease-in-out infinite;
+}
+
+@keyframes glowText {
+  0%, 100% {
+    text-shadow: 0 0 10px rgba(255,255,255,0.3), 0 0 20px rgba(255,255,255,0.2), 0 0 40px rgba(255,255,255,0.1);
+    color: #e4a5a5;
+  }
+  25% {
+    text-shadow: 0 0 20px rgba(209,204,107,0.8), 0 0 40px rgba(197,199,112,0.6), 0 0 80px rgba(155,164,129,0.4);
+    color: #ff6600;
+  }
+  50% {
+    text-shadow: 0 0 20px rgba(209,204,107,0.8), 0 0 40px rgba(197,199,112,0.6), 0 0 80px rgba(155,164,129,0.4);
+    color: #ff5100;
+  }
+  75% {
+    text-shadow: 0 0 20px rgba(209,204,107,0.8), 0 0 40px rgba(197,199,112,0.6), 0 0 80px rgba(155,164,129,0.4);
+    color: #ff0000;
+  }
+}
+
+.gallery-subtitle {
+  color: #888;
+  font-size: clamp(0.88rem, 2vw, 0.97rem);
+  max-width: 520px;
+  margin: 0 auto 14px;
+  line-height: 1.7;
+}
+
+.gallery-hint {
+  display: inline-block;
+  background: linear-gradient(135deg, #110d77, #a81414);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 50px;
+  padding: 6px 16px;
+  font-size: 1rem;
+  color: #ffffff;
+}
+
+/* ── CAROUSEL WRAPPER ── */
+.gallery-carousel-wrapper {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  padding: 24px 0 30px;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+.gallery-carousel-wrapper:active {
+  cursor: grabbing;
+}
+
+/* ── TRACK ── */
+.gallery-track {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 2vw, 18px);
+  will-change: transform;
+  user-select: none;
+  transition: transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.gallery-track.is-dragging {
+  transition: none;
+  cursor: grabbing;
+}
+
+/* ── CARD ── */
+.gallery-card {
+  flex: 0 0 auto;
+  width: clamp(180px, 28vw, 300px);
+  aspect-ratio: 3 / 4;
+  border-radius: clamp(10px, 2vw, 18px);
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+  transition:
+    transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    box-shadow 0.45s ease,
+    opacity 0.45s ease,
+    filter 0.45s ease;
+  transform: scale(0.78) rotateY(6deg);
+  opacity: 0.5;
+  filter: brightness(0.6) saturate(0.65);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.gallery-card.side-left {
+  transform: scale(0.78) rotateY(-6deg);
+}
+
+.gallery-card.is-near {
+  transform: scale(0.88) rotateY(3deg);
+  opacity: 0.78;
+  filter: brightness(0.82) saturate(0.88);
+  box-shadow: 0 10px 35px rgba(0,0,0,0.3);
+}
+
+.gallery-card.is-near.side-left {
+  transform: scale(0.88) rotateY(-3deg);
+}
+
+.gallery-card.is-center {
+  transform: scale(1) rotateY(0deg);
+  opacity: 1;
+  filter: brightness(1) saturate(1.1);
+  box-shadow:
+    0 20px 60px rgba(168,20,20,0.4),
+    0 0 0 2px rgba(240,192,64,0.65);
+  z-index: 10;
+}
+
+/* ── IMAGE ── */
+.gallery-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s ease;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.gallery-card.is-center:hover .gallery-card-img {
+  transform: scale(1.04);
+}
+
+/* ── OVERLAY ── */
+.gallery-card-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.15) 55%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: clamp(10px, 2vw, 18px);
+}
+
+.gallery-card.is-center .gallery-card-overlay {
+  opacity: 1;
+}
+
+.gallery-card-label {
+  color: #fff;
+  font-size: clamp(0.8rem, 2vw, 1rem);
+  font-weight: 600;
+  line-height: 1.3;
+  margin-bottom: 6px;
+}
+
+.gallery-card-tag {
+  background: #f0c040;
+  color: #111;
+  padding: 2px 10px;
+  border-radius: 50px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  align-self: flex-start;
+}
+
+.gallery-card-badge {
+  position: absolute;
+  top: 10px; right: 10px;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 50px;
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+
+/* ── CAPTION ── */
+.gallery-center-caption {
+  text-align: center;
+  margin-top: 16px;
+  min-height: 44px;
+  padding: 0 16px;
+}
+
+.gallery-center-caption-label {
+  color: #fff;
+  font-size: clamp(0.9rem, 2.5vw, 1.05rem);
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.gallery-center-caption-tag {
+  display: inline-block;
+  background: #f0c040;
+  color: #111;
+  padding: 2px 12px;
+  border-radius: 50px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+/* ── DOTS ── */
+.gallery-dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 18px;
+}
+
+.gallery-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  transition: all 0.35s ease;
+  cursor: pointer;
+  border: none; padding: 0;
+}
+
+.gallery-dot.active {
+  width: 22px;
+  border-radius: 4px;
+  background: #f0c040;
+}
+
+/* ── FOOTER ── */
+.gallery-footer {
+  text-align: center;
+  margin-top: 28px;
+}
+
+.gallery-view-btn {
+  padding: 12px 32px;
+  background: linear-gradient(135deg, #0d7377, #a81414);
+  color: #fff;
+  border: none;
+  border-radius: 50px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(13,115,119,0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.gallery-view-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(13,115,119,0.45);
+}
+
+/* ── LIGHTBOX ── */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.95);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.lightbox-close {
+  position: absolute; top: 16px; right: 16px;
+  background: rgba(255,255,255,0.12);
+  border: none; color: #fff;
+  width: 40px; height: 40px;
+  border-radius: 50%; font-size: 1.1rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s; z-index: 10;
+}
+.lightbox-close:hover { background: rgba(255,255,255,0.25); }
+
+.lightbox-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  background: rgba(255,255,255,0.12);
+  border: none; color: #fff;
+  width: 50px; height: 50px;
+  border-radius: 50%; font-size: 1.6rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s; z-index: 10;
+}
+.lightbox-arrow:hover { background: rgba(255,255,255,0.28); }
+.lightbox-prev { left: 16px; }
+.lightbox-next { right: 16px; }
+
+.lightbox-content { max-width: 900px; width: 100%; animation: zoomIn 0.25s ease; }
+
+@keyframes zoomIn {
+  from { transform: scale(0.88); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+
+.lightbox-img {
+  width: 100%; max-height: 75vh;
+  object-fit: contain; border-radius: 12px;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.5); display: block;
+}
+
+.lightbox-info { text-align: center; margin-top: 16px; }
+.lightbox-label { color: #fff; font-size: clamp(0.95rem, 2.5vw, 1.1rem); font-weight: 600; margin-bottom: 6px; }
+.lightbox-tag { background: #f0c040; color: #111; padding: 3px 12px; border-radius: 50px; font-size: 0.74rem; font-weight: 700; display: inline-block; }
+.lightbox-counter { color: rgba(255,255,255,0.4); font-size: 0.78rem; margin-top: 10px; }
+
+.lightbox-dots {
+  position: absolute; bottom: 16px;
+  left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px;
+}
+.lightbox-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+  transition: all 0.3s; cursor: pointer; border: none; padding: 0;
+}
+.lightbox-dot.active { width: 20px; border-radius: 4px; background: #f0c040; }
+
+@media (prefers-reduced-motion: reduce) {
+  .gallery-card { transition: none; }
+  .gallery-title { animation: none; color: #f0c040; }
+}
+
+@media (max-width: 600px) {
+  .gallery-card { width: clamp(160px, 62vw, 230px); }
+  .lightbox-arrow { width: 38px; height: 38px; font-size: 1.3rem; }
+  .lightbox-prev { left: 8px; }
+  .lightbox-next { right: 8px; }
+}

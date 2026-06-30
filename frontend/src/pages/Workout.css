@@ -1,0 +1,225 @@
+.workout-page { min-height: 100vh; }
+.workout-header { position:relative; padding:5rem 2rem 3rem; text-align:center; overflow:hidden; }
+.wh-bg { position:absolute; inset:0; pointer-events:none; }
+.wh-orb { position:absolute; width:600px;height:300px; border-radius:50%; filter:blur(100px); opacity:0.15; top:-50px; left:50%; transform:translateX(-50%); transition:background 0.4s ease; }
+.wh-content { position:relative; z-index:1; }
+.download-btn { margin-top:1.5rem; display:inline-flex; padding:10px 24px; }
+
+.plan-selector-section { background:var(--bg-secondary); border-top:1px solid var(--border); border-bottom:1px solid var(--border); padding:3rem 2rem; }
+.plan-selector-inner { max-width:1200px; margin:0 auto; text-align:center; }
+.plan-selector-title { font-size:2.5rem !important; margin-bottom:2rem; }
+.plan-selector-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; margin-top:1.5rem; }
+.plan-select-card { background:var(--bg-card); border:2px solid var(--border); border-radius:var(--radius-lg); padding:1.5rem 1rem; cursor:pointer; transition:all 0.3s ease; text-align:center; display:flex; flex-direction:column; align-items:center; gap:0.4rem; }
+.plan-select-card:hover { transform:translateY(-6px); border-color:var(--plan-color,var(--accent)); box-shadow:0 0 25px rgba(255,255,255,0.05); }
+.plan-select-card.active { transform:translateY(-4px); }
+.psc-badge { padding:3px 10px; border-radius:50px; font-family:'Barlow Condensed',sans-serif; font-size:0.7rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; }
+.psc-num { font-family:'Bebas Neue',cursive; font-size:4rem; line-height:1; }
+.psc-label { font-family:'Barlow Condensed',sans-serif; font-size:1rem; font-weight:700; text-transform:uppercase; color:var(--text-primary); }
+.psc-sub { font-size:0.78rem; color:var(--text-secondary); line-height:1.4; }
+
+.day-tabs-wrap { background:var(--bg-secondary); border-top:1px solid var(--border); border-bottom:1px solid var(--border); overflow-x:auto; position:sticky; top:70px; z-index:100; }
+.day-tabs { display:flex; max-width:1200px; margin:0 auto; padding:0 2rem; }
+.day-tab { display:flex; align-items:center; gap:0.75rem; padding:1.2rem 2rem; background:none; border:none; border-bottom:3px solid transparent; cursor:pointer; color:var(--text-secondary); transition:all 0.3s ease; white-space:nowrap; flex-shrink:0; }
+.day-tab:hover { color:var(--text-primary); background:var(--bg-card); }
+.day-tab.active { border-bottom-color:currentColor; background:var(--bg-card); }
+.tab-emoji { font-size:1.4rem; }
+.tab-day { display:block; font-size:0.7rem; font-weight:700; letter-spacing:0.15em; text-transform:uppercase; font-family:'Barlow Condensed',sans-serif; }
+.tab-name { display:block; font-family:'Barlow Condensed',sans-serif; font-size:0.9rem; font-weight:600; }
+
+.workout-content { max-width:1200px; margin:0 auto; padding:2.5rem 2rem; }
+.day-intro { background:var(--bg-card); border:1px solid; border-radius:var(--radius-lg); padding:1.75rem; margin-bottom:2rem; transition:border-color 0.4s ease; }
+.day-intro-header { display:flex; align-items:flex-start; gap:1.25rem; margin-bottom:1rem; }
+.day-big-emoji { font-size:3rem; flex-shrink:0; }
+.day-intro-title { font-family:'Barlow Condensed',sans-serif; font-size:1.4rem; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:0.5rem; }
+.day-intro-desc { color:var(--text-secondary); font-size:0.95rem; line-height:1.6; }
+.day-meta { display:flex; gap:1.5rem; flex-wrap:wrap; padding-top:1rem; border-top:1px solid var(--border); font-family:'Barlow Condensed',sans-serif; font-size:0.9rem; font-weight:600; color:var(--text-secondary); letter-spacing:0.05em; }
+
+.exercises-grid { display:flex; flex-direction:column; gap:1rem; }
+.exercise-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; transition:all 0.3s ease; }
+.exercise-card:hover, .exercise-card.expanded { border-color:var(--day-color,var(--accent)); box-shadow:0 0 20px rgba(255,255,255,0.04); }
+.ex-card-main { display:grid; grid-template-columns:130px 1fr; gap:0; cursor:pointer; }
+
+/* ── GIF Styles ── */
+.ex-gif-wrap {
+  position: relative;
+  width: 130px;
+  min-height: 110px;
+  height: 110px;
+  background: var(--bg-secondary);
+  border-right: 2px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.ex-gif-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  display: block;
+  min-height: 110px;
+  position: absolute;
+  top: 0; left: 0;
+}
+.ex-gif-img.loaded { opacity: 1; }
+/* Frame flip animation */
+.ex-gif-frame {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  min-height: 110px;
+}
+.ex-gif-frame.active-frame { opacity: 1; }
+.ex-gif-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.ex-gif-emoji { font-size: 2rem; }
+.gif-loading-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: gifPulse 1s ease-in-out infinite;
+}
+@keyframes gifPulse { 0%,100%{opacity:0.3;transform:scale(0.8)} 50%{opacity:1;transform:scale(1.2)} }
+.ex-gif-placeholder {
+  width: 130px;
+  min-height: 110px;
+  background: var(--bg-secondary);
+  border-right: 2px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+/* Legacy emoji wrap kept as alias */
+.ex-emoji-wrap { background:var(--bg-secondary); display:flex; align-items:center; justify-content:center; min-height:110px; }
+.ex-emoji { font-size:2.5rem; }
+.ex-info { padding:1.25rem 1.5rem; display:flex; flex-direction:column; gap:0.75rem; }
+.ex-header { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; }
+.ex-name { font-family:'Barlow Condensed',sans-serif; font-size:1.2rem; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:0.2rem; }
+.ex-muscle { font-size:0.8rem; color:var(--text-secondary); font-style:italic; }
+.ex-sets-reps { text-align:right; flex-shrink:0; }
+.ex-sets { display:block; font-family:'Barlow Condensed',sans-serif; font-size:0.85rem; font-weight:600; color:var(--text-secondary); }
+.ex-reps { display:block; font-family:'Bebas Neue',cursive; font-size:1.2rem; letter-spacing:0.05em; }
+.ex-muscles { display:flex; flex-wrap:wrap; gap:5px; }
+.muscle-tag { padding:2px 8px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:50px; font-size:0.7rem; color:var(--text-secondary); }
+.expand-btn { background:none; border:none; cursor:pointer; font-family:'Barlow Condensed',sans-serif; font-size:0.85rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; padding:0; align-self:flex-start; margin-top:auto; transition:opacity 0.2s; }
+.expand-btn:hover { opacity:0.7; }
+.ex-expanded-content { padding:1.5rem; border-top:1px solid var(--border); background:var(--bg-secondary); animation:fadeIn 0.3s ease; }
+.tips-title { font-family:'Barlow Condensed',sans-serif; font-size:1rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:1rem; color:var(--text-primary); }
+.tips-list { list-style:none; display:flex; flex-direction:column; gap:0.75rem; }
+.tip-item { display:flex; align-items:flex-start; gap:0.75rem; font-size:0.9rem; color:var(--text-secondary); line-height:1.5; }
+.tip-num { display:flex; align-items:center; justify-content:center; width:22px;height:22px; border-radius:50%; font-size:0.7rem; font-weight:700; color:white; flex-shrink:0; margin-top:1px; }
+
+.workout-guidelines { background:var(--bg-secondary); border-top:1px solid var(--border); padding:3rem 2rem; max-width:1200px; margin:0 auto; }
+.g-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:1rem; }
+.g-card { display:flex; align-items:flex-start; gap:1rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:1.25rem; }
+.g-icon { font-size:1.5rem; flex-shrink:0; }
+.g-card strong { display:block; font-family:'Barlow Condensed',sans-serif; font-size:1rem; font-weight:700; text-transform:uppercase; margin-bottom:0.3rem; }
+.g-card p { font-size:0.85rem; color:var(--text-secondary); line-height:1.5; }
+
+@media (max-width:640px) {
+  .ex-card-main { grid-template-columns:100px 1fr; }
+  .ex-gif-wrap, .ex-gif-placeholder { width:100px; min-height:90px; }
+  .ex-gif-img { min-height:90px; }
+  .ex-emoji-wrap { min-height:70px; }
+  .day-tab { padding:1rem; }
+  .tab-name { display:none; }
+  .plan-selector-grid { grid-template-columns:1fr 1fr; }
+}
+
+/* ── LOCKED PLAN ── */
+.locked-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 900; backdrop-filter: blur(4px); }
+.locked-modal-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.locked-modal { background: var(--bg-card); border: 1px solid rgba(255,69,0,0.3); border-radius: var(--radius-lg); padding: 3rem 2rem; text-align: center; max-width: 380px; pointer-events: all; animation: slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes slideUp { from { transform: translateY(40px) scale(0.95); opacity: 0; } }
+.locked-icon { font-size: 3rem; display: block; margin-bottom: 1rem; }
+.locked-modal h3 { font-family: 'Bebas Neue', cursive; font-size: 2rem; color: var(--text-primary); margin-bottom: 0.75rem; }
+.locked-modal p { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; margin-bottom: 1rem; }
+.locked-badge { display: inline-block; padding: 4px 16px; border-radius: 20px; background: rgba(255,69,0,0.1); border: 1px solid rgba(255,69,0,0.3); color: var(--accent); font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.1em; }
+
+.lock-badge { position: absolute; top: 8px; right: 8px; font-size: 1rem; }
+.locked-card { opacity: 0.7; }
+
+/* ── 6-DAY LEVEL CARDS ── */
+.six-day-level-section { max-width: 900px; margin: 2rem auto; padding: 2rem; }
+.level-cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.level-card { background: var(--bg-card); border: 2px solid var(--border); border-radius: var(--radius-lg); padding: 2rem; cursor: pointer; transition: all 0.3s ease; position: relative; }
+.level-card:hover { border-color: #00bfff; transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,191,255,0.1); }
+.level-card-advanced { border-color: rgba(255,69,0,0.3); }
+.level-card-advanced:hover { border-color: var(--accent); box-shadow: 0 20px 40px rgba(255,69,0,0.15); }
+.level-card-badge { position: absolute; top: -1px; right: 1.5rem; background: var(--accent); color: white; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 12px; border-radius: 0 0 8px 8px; }
+.level-card-icon { font-size: 2.5rem; margin-bottom: 0.75rem; display: block; }
+.level-card h3 { font-family: 'Barlow Condensed', sans-serif; font-size: 1.4rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem; color: var(--text-primary); }
+.level-card p { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 1rem; }
+.level-features { list-style: none; display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.75rem; }
+.level-features li { font-size: 0.82rem; color: var(--text-secondary); }
+.level-note { font-size: 0.78rem; color: var(--accent); background: rgba(255,69,0,0.08); border: 1px solid rgba(255,69,0,0.2); border-radius: 8px; padding: 6px 12px; }
+@media (max-width: 640px) { .level-cards-grid { grid-template-columns: 1fr; } }
+
+/* ── WORKOUT GUIDELINES ── */
+.workout-guidelines { padding: 4rem 2rem; max-width: 1000px; margin: 0 auto; }
+.guidelines-grid-wk { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+.guideline-item { display: flex; align-items: flex-start; gap: 1rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
+.gi-icon { font-size: 1.8rem; flex-shrink: 0; }
+.gi-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-bottom: 0.25rem; }
+.gi-text { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; }
+
+/* ── YT BUTTON ── */
+.yt-btn { display: inline-flex; align-items: center; gap: 6px; margin-top: 0.75rem; padding: 6px 16px; background: rgba(255,0,0,0.08); border: 1px solid rgba(255,0,0,0.2); border-radius: 20px; color: #ff4444; font-size: 0.8rem; font-weight: 600; text-decoration: none; transition: all 0.2s; }
+.yt-btn:hover { background: rgba(255,0,0,0.15); }
+
+/* ── WORKOUT PAGE BACKDROP IMPROVEMENTS ── */
+.plan-select-card,
+.exercise-card,
+.level-card,
+.day-intro,
+.guideline-item {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--bg-card) 88%, transparent) !important;
+}
+.locked-modal {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ── PLAN DOWNLOAD BUTTONS ── */
+.plan-dl-btn {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid;
+}
+.plan-dl-active {
+  background: transparent;
+}
+.plan-dl-active:hover {
+  background: rgba(255,69,0,0.12);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.plan-dl-locked {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.1) !important;
+  color: rgba(255,255,255,0.25) !important;
+  cursor: not-allowed;
+}
