@@ -77,7 +77,7 @@ export const workoutPlans = {
       {day:'Day 4',focus:'Shoulders',title:'Full Shoulder Day',emoji:'🏛️',color:'#bf00ff',exercises:['ohp','lateral-raise','rear-delt-cable-fly','reverse-fly']},
       {day:'Day 5',focus:'Arms + Glutes',title:'Arms + Glutes',emoji:'💪',color:'#39ff14',exercises:['barbell-curl','hammer-curl','tricep-pushdown','hip-thrust','ham-curl','calf-raise']},
     ]},
-  6:{ days:6,label:'6 Day Split',subtitle:'Elite PPL — Advanced Athletes Only',description:'The full PPL twice per week. Maximum volume and frequency for Begginers And Intermidiates lifters.',badge:'Elite',color:'#ff4500',
+  6:{ days:6,label:'6 Day Split',subtitle:'Elite PPL — For Everyone',description:'The full PPL twice per week. Maximum volume and frequency for Begginers And Intermidiates lifters.',badge:'Elite',color:'#ff4500',
     // Standard Beginner/Intermediate schedule (classic PPL)
     schedule:[
       {day:'Day 1',focus:'Push A',title:'Chest + Shoulders + Triceps',emoji:'🏋️',color:'#ff3b6b',
