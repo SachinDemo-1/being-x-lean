@@ -21,7 +21,16 @@ export const AuthProvider = ({ children }) => {
           setUser(res.data.user);
           setThemeState(res.data.user.theme || 'dark-fire');
         })
-        .catch(() => localStorage.removeItem('fitppl_token'))
+        .catch((err) => {
+          // Only log the user out if the server actually rejected the token.
+          // Any other failure (backend asleep/cold-start, network blip, timeout)
+          // should NOT wipe a valid session — just leave them logged in and retry later.
+          const status = err.response?.status;
+          if (status === 401 || status === 403) {
+            localStorage.removeItem('fitppl_token');
+            delete axios.defaults.headers.common['Authorization'];
+          }
+        })
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
