@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { applyTheme } from './context/themes';
 import Navbar from './components/Navbar';
+import BackButton from './components/BackButton';
 import Home from './pages/Home';
 import Workout from './pages/Workout';
 import Diet from './pages/Diet';
@@ -21,6 +22,7 @@ const AppContent = () => {
     <Router>
       <div className="app-wrapper">
         <Navbar />
+        <BackButton />
         <main className="main-content">
           <Routes>
             <Route path="/" element={<Home />} />

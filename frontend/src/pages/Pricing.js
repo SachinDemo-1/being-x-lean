@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { grantPlan, hasPlan } from '../context/purchases';
 import './Pricing.css';
@@ -78,7 +78,18 @@ const PLANS = [
 export default function Pricing() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(null);
+
+  // 'for=workout' (came from Workout page) -> only Workout + Combo
+  // 'for=diet'    (came from Diet page)    -> only Diet + Combo
+  // no param      (visited Plans directly) -> show all three
+  const focus = searchParams.get('for'); // 'workout' | 'diet' | null
+  const visiblePlans = PLANS.filter(plan => {
+    if (!focus) return true;
+    if (plan.id === 'combo') return true;
+    return plan.id === focus;
+  });
 
   const handleBuy = async (plan) => {
     if (!user) { navigate('/auth'); return; }
@@ -139,7 +150,7 @@ export default function Pricing() {
       </div>
 
       <div className="pricing-cards-wrap">
-        {PLANS.map((plan, i) => (
+        {visiblePlans.map((plan, i) => (
           <div key={plan.id} className={`pricing-card ${plan.best ? 'pricing-card-best' : ''}`} style={{ '--plan-color': plan.color, position: 'relative',overflow: 'hidden',}}>
             {plan.best && <div className="best-value-badge">BEST VALUE</div>}
             <div className="pc-icon-wrap" style={{ background: `radial-gradient(circle, ${plan.color}22, transparent)`, border: `2px solid ${plan.color}` }}>

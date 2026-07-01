@@ -1,0 +1,42 @@
+.back-btn {
+  position: fixed;
+  top: 85px;
+  left: 16px;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(18, 13, 8, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1.5px solid var(--border, #3d1f00);
+  border-radius: 999px;
+  color: var(--text-secondary, #c9a07a);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.back-btn:hover {
+  border-color: var(--accent, #ff4500);
+  color: var(--accent, #ff4500);
+  transform: translateX(-2px);
+}
+
+.back-btn-arrow {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+@media (max-width: 600px) {
+  .back-btn {
+    top: 78px;
+    left: 10px;
+    padding: 6px 10px;
+    font-size: 0.75rem;
+  }
+  .back-btn-label {
+    display: none;
+  }
+}

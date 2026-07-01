@@ -481,7 +481,7 @@ export default function Diet() {
 
   useEffect(() => {
     if (!user) { navigate('/auth'); return; }
-    if (!hasPlan(user, 'diet')) { navigate('/pricing'); return; }
+    if (!hasPlan(user, 'diet')) { navigate('/pricing?for=diet'); return; }
   }, [user, navigate]);
 
   useEffect(() => {

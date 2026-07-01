@@ -291,12 +291,14 @@ export default function Workout() {
   const [lockedPlan, setLockedPlan] = useState(null);
   const [sixDayLevel, setSixDayLevel] = useState(null);
   const workoutRef = useRef(null);
+  const dayTabsRef = useRef(null);
+  const contentAnchorRef = useRef(null);
   const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!user) { navigate('/auth'); return; }
-    if (!hasPlan(user, 'workout')) { navigate('/pricing'); return; }
+    if (!hasPlan(user, 'workout')) { navigate('/pricing?for=workout'); return; }
   }, [user, navigate]);
 
   const plan = workoutPlans[selectedDays];
@@ -328,9 +330,19 @@ export default function Workout() {
     if (days === 6) setSixDayLevel(null);
     setSelectedDays(days);
     setSearchParams({ days });
-    // Scroll to plan section after selection
+    // Scroll straight to the level card / plan content that appears below,
+    // instead of just the top selector row (user shouldn't have to hunt for it).
     setTimeout(() => {
-      planSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      contentAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  };
+
+  const handleSixDayLevelSelect = (level) => {
+    setSixDayLevel(level);
+    // Scroll down to the day tabs / plan content once it renders,
+    // instead of the card just disappearing and the page jumping.
+    setTimeout(() => {
+      dayTabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
   };
 
@@ -365,69 +377,71 @@ export default function Workout() {
         <PlanSelector currentDays={selectedDays} onSelect={handleSelectDays} />
       </div>
 
-      {/* 6-Day Level Selection */}
-      {selectedDays === 6 && sixDayLevel === null && (
-        <SixDayLevelCards onSelect={setSixDayLevel} />
-      )}
+      <div ref={contentAnchorRef}>
+        {/* 6-Day Level Selection */}
+        {selectedDays === 6 && sixDayLevel === null && (
+          <SixDayLevelCards onSelect={handleSixDayLevelSelect} />
+        )}
 
-      {/* Day Tabs (shown when not in level-select mode for 6-day) */}
-      {(selectedDays !== 6 || sixDayLevel !== null) && (
-        <>
-          {selectedDays === 6 && (
-            <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                Mode: <strong style={{ color: 'var(--accent)' }}>{sixDayLevel === 'advanced' ? '💀 Advanced' : '🌱 Beginner/Intermediate'}</strong>
-              </span>
-              <button className="btn-outline" style={{ marginLeft: '1rem', padding: '4px 12px', fontSize: '0.75rem' }} onClick={() => setSixDayLevel(null)}>Change Level</button>
+        {/* Day Tabs (shown when not in level-select mode for 6-day) */}
+        {(selectedDays !== 6 || sixDayLevel !== null) && (
+          <>
+            {selectedDays === 6 && (
+              <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  Mode: <strong style={{ color: 'var(--accent)' }}>{sixDayLevel === 'advanced' ? '💀 Advanced' : '🌱 Beginner/Intermediate'}</strong>
+                </span>
+                <button className="btn-outline" style={{ marginLeft: '1rem', padding: '4px 12px', fontSize: '0.75rem' }} onClick={() => setSixDayLevel(null)}>Change Level</button>
+              </div>
+            )}
+            <div className="day-tabs-wrap" ref={dayTabsRef}>
+              <div className="day-tabs">
+                {activeSchedule.map((day, i) => (
+                  <button key={i} className={`day-tab ${activeDayIndex === i ? 'active' : ''}`}
+                    style={activeDayIndex === i ? { borderColor: day.color, color: day.color } : {}}
+                    onClick={() => handleDaySelect(i)}>
+                    <span className="tab-emoji">{day.emoji}</span>
+                    <div>
+                      <span className="tab-day">{day.day}</span>
+                      <span className="tab-name">{day.title}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
-          )}
-          <div className="day-tabs-wrap">
-            <div className="day-tabs">
-              {activeSchedule.map((day, i) => (
-                <button key={i} className={`day-tab ${activeDayIndex === i ? 'active' : ''}`}
-                  style={activeDayIndex === i ? { borderColor: day.color, color: day.color } : {}}
-                  onClick={() => handleDaySelect(i)}>
-                  <span className="tab-emoji">{day.emoji}</span>
+
+            <div className="workout-content" ref={workoutRef}>
+              <div className="day-intro" style={{ borderColor: activeDay.color }}>
+                <div className="day-intro-header">
+                  <span className="day-big-emoji">{activeDay.emoji}</span>
                   <div>
-                    <span className="tab-day">{day.day}</span>
-                    <span className="tab-name">{day.title}</span>
+                    <h2 className="day-intro-title">{activeDay.day}: {activeDay.title}</h2>
+                    <p className="day-intro-desc">{plan.description}</p>
                   </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="workout-content" ref={workoutRef}>
-            <div className="day-intro" style={{ borderColor: activeDay.color }}>
-              <div className="day-intro-header">
-                <span className="day-big-emoji">{activeDay.emoji}</span>
-                <div>
-                  <h2 className="day-intro-title">{activeDay.day}: {activeDay.title}</h2>
-                  <p className="day-intro-desc">{plan.description}</p>
+                </div>
+                <div className="day-meta">
+                  <span>📊 {activeDay.exercises.length} Exercises</span>
+                  <span>🔁 9–12 Reps</span>
+                  <span>⏱️ 60–90s Rest</span>
+                  <span>🎯 {activeDay.focus}</span>
                 </div>
               </div>
-              <div className="day-meta">
-                <span>📊 {activeDay.exercises.length} Exercises</span>
-                <span>🔁 9–12 Reps</span>
-                <span>⏱️ 60–90s Rest</span>
-                <span>🎯 {activeDay.focus}</span>
+
+              <div className="exercises-grid">
+                {activeDay.exercises.map((exId, i) => {
+                  const ex = exerciseDB[exId];
+                  if (!ex) return null;
+                  return (
+                    <div key={ex.id} style={{ animationDelay: `${i * 0.08}s`, animation: 'fadeInUp 0.5s ease both' }}>
+                      <ExerciseCard exercise={ex} dayColor={activeDay.color} />
+                    </div>
+                  );
+                })}
               </div>
             </div>
-
-            <div className="exercises-grid">
-              {activeDay.exercises.map((exId, i) => {
-                const ex = exerciseDB[exId];
-                if (!ex) return null;
-                return (
-                  <div key={ex.id} style={{ animationDelay: `${i * 0.08}s`, animation: 'fadeInUp 0.5s ease both' }}>
-                    <ExerciseCard exercise={ex} dayColor={activeDay.color} />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </div>
 
       {/* Locked plan modal */}
       {lockedPlan && <LockedPlanCard plan={lockedPlan} />}
