@@ -13,7 +13,7 @@ export default function AuthPage() {
   const [otpSent, setOtpSent] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, register, loginWithGoogle, loginWithFacebook } = useAuth();
+  const { login, register, loginWithGoogle, loginWithFacebook, setUser } = useAuth();
   const navigate = useNavigate();
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
@@ -42,7 +42,11 @@ export default function AuthPage() {
         const res = await axios.post(`${process.env.REACT_APP_API_URL}/auth/verify-email-otp`, {
           name: form.name, email: form.email, password: form.password, otp
         });
-        login(res.data.token, res.data.user);
+        // store token and user directly — don't call login() which would
+        // make a second /auth/login API call and fail
+        localStorage.setItem('fitppl_token', res.data.token);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
+        setUser(res.data.user);
         navigate('/');
         return;
       }
@@ -117,7 +121,6 @@ export default function AuthPage() {
 
         <div className="auth-divider"><span>or continue with</span></div>
 
-        {/* Social Login Buttons */}
         <div className="social-buttons">
           <button className="social-btn google-btn" onClick={loginWithGoogle}>
             <svg width="18" height="18" viewBox="0 0 18 18">
