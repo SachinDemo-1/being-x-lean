@@ -480,8 +480,8 @@ export default function Diet() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!user) { navigate('/auth'); return; }
-    if (!hasPlan(user, 'diet')) { navigate('/pricing?for=diet'); return; }
+    if (!user) { navigate('/auth', { replace: true }); return; }
+    if (!hasPlan(user, 'diet')) { navigate('/pricing?for=diet', { replace: true }); return; }
   }, [user, navigate]);
 
   useEffect(() => {

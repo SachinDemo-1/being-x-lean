@@ -188,10 +188,11 @@ function ExerciseCard({ exercise, dayColor }) {
 }
 
 // ── Locked Plan Card ───────────────────────────────────────────────────────────
-function LockedPlanCard({ plan }) {
+function LockedPlanCard({ plan, onClose }) {
   return (
     <div className="locked-modal-overlay">
       <div className="locked-modal">
+        <button className="locked-modal-close" onClick={onClose} aria-label="Go back">← Back</button>
         <span className="locked-icon">🔒</span>
         <h3>Plan Locked</h3>
         <p>The <strong>{plan.label}</strong> is not available yet. Stay tuned for updates!</p>
@@ -297,8 +298,8 @@ export default function Workout() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user) { navigate('/auth'); return; }
-    if (!hasPlan(user, 'workout')) { navigate('/pricing?for=workout'); return; }
+    if (!user) { navigate('/auth', { replace: true }); return; }
+    if (!hasPlan(user, 'workout')) { navigate('/pricing?for=workout', { replace: true }); return; }
   }, [user, navigate]);
 
   const plan = workoutPlans[selectedDays];
@@ -444,7 +445,7 @@ export default function Workout() {
       </div>
 
       {/* Locked plan modal */}
-      {lockedPlan && <LockedPlanCard plan={lockedPlan} />}
+      {lockedPlan && <LockedPlanCard plan={lockedPlan} onClose={() => setLockedPlan(null)} />}
       {lockedPlan && <div className="locked-backdrop" onClick={() => setLockedPlan(null)}></div>}
 
       <div className="workout-guidelines">

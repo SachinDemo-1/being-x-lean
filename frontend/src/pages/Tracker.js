@@ -40,7 +40,7 @@ export default function Tracker() {
   const [toast, setToast] = useState('');
 
   useEffect(() => {
-    if (!user) { navigate('/auth'); return; }
+    if (!user) { navigate('/auth', { replace: true }); return; }
   }, [user, navigate]);
 
   useEffect(() => {

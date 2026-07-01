@@ -144,7 +144,9 @@
 /* ── LOCKED PLAN ── */
 .locked-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 900; backdrop-filter: blur(4px); }
 .locked-modal-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-.locked-modal { background: var(--bg-card); border: 1px solid rgba(255,69,0,0.3); border-radius: var(--radius-lg); padding: 3rem 2rem; text-align: center; max-width: 380px; pointer-events: all; animation: slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+.locked-modal { background: var(--bg-card); border: 1px solid rgba(255,69,0,0.3); border-radius: var(--radius-lg); padding: 3rem 2rem; text-align: center; max-width: 380px; pointer-events: all; animation: slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1); position: relative; }
+.locked-modal-close { position: absolute; top: 14px; left: 14px; background: transparent; border: 1px solid var(--border); color: var(--text-secondary); font-size: 0.8rem; font-weight: 600; padding: 6px 12px; border-radius: 999px; cursor: pointer; transition: all 0.2s ease; }
+.locked-modal-close:hover { border-color: var(--accent); color: var(--accent); }
 @keyframes slideUp { from { transform: translateY(40px) scale(0.95); opacity: 0; } }
 .locked-icon { font-size: 3rem; display: block; margin-bottom: 1rem; }
 .locked-modal h3 { font-family: 'Bebas Neue', cursive; font-size: 2rem; color: var(--text-primary); margin-bottom: 0.75rem; }
