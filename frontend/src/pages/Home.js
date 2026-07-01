@@ -494,9 +494,9 @@ export default function Home() {
           <div className="footer-contact">
             <h4>Connect With Us</h4>
             <div className="footer-links">
-              <a href="https://prashantgola2017@gmail.com" className="footer-link"><img src="/images/gmail.png" alt="gmail" style={{ width: '18px', height: '18px', verticalAlign: 'middle', marginRight: '4px' }} />beingxlean@gmail.com</a>
+              <a href="https://mail.google.com/mail/u/0/?tab=rm&ogbl#search/prashantgola2017%40gmail.com?compose=new" className="footer-link"><img src="/images/gmail.png" alt="gmail" style={{ width: '18px', height: '18px', verticalAlign: 'middle', marginRight: '4px' }} />beingxlean@gmail.com</a>
               <a href="https://www.instagram.com/being_x_lean/" target="_blank" rel="noopener noreferrer" className="footer-link"><img src="/images/instagram.png" alt="Instagram" style={{ width: '18px', height: '18px', verticalAlign: 'middle', marginRight: '4px' }} /> @beingxlean</a>
-              <a href="https://www.youtube.com/@Getfitwithprashant" target="_blank" rel="noopener noreferrer" className="footer-link">▶<img src="/images/youtube.png" alt="youtube" style={{ width: '18px', height: '18px', verticalAlign: 'middle', marginRight: '4px' }} /> YouTube</a>
+              <a href="https://www.youtube.com/@Getfitwithprashant" target="_blank" rel="noopener noreferrer" className="footer-link"><img src="/images/youtube.png" alt="youtube" style={{ width: '18px', height: '18px', verticalAlign: 'middle', marginRight: '4px' }} /> YouTube</a>
             </div>
           </div>
         </div>

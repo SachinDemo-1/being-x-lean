@@ -213,7 +213,7 @@ function SixDayLevelCards({ onSelect }) {
           <div className="level-card-badge">Push-Pull-Leg</div>
           <div className="level-card-icon">💀</div>
           <h3>Ultimate Workout Plan</h3>
-          <p>High frequency, Normal volume PPL for lifters who have built a strong base. Just for beginners.</p>
+          <p>High frequency, Normal volume PPL for lifters who have built a strong base. Just for beginners And Intermidiates.</p>
           <ul className="level-features">
             <li>✅ 7–8 exercises per day</li>
             <li>✅ 9–12 rep range with light work</li>
