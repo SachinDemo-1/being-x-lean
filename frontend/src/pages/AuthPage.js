@@ -78,7 +78,7 @@ export default function AuthPage() {
           <button className={`auth-tab ${mode === 'register' ? 'active' : ''}`} onClick={() => { setMode('register'); setError(''); setOtpSent(false); }}>Create Account</button>
         </div>
 
-        <h1 className="auth-title">{mode === 'login' ? 'Welcome Back 💪' : 'Join The Iron Family 🔥'}</h1>
+        <h1 className="auth-title">{mode === 'login' ? 'Welcome Back 💪' : 'Join The Fit Army 🔥'}</h1>
         <p className="auth-subtitle">
           {mode === 'login' ? 'Sign in to access your workout plan, diet plan, and progress tracker.' : 'Create your free account and start building your best physique.'}
         </p>
@@ -99,7 +99,7 @@ export default function AuthPage() {
           </div>
           <div className="form-group">
             <label>Password</label>
-            <input type="password" name="password" value={form.password} onChange={handleChange} placeholder="••••••••" required minLength={6} />
+            <input type="password" name="password" value={form.password} onChange={handleChange} placeholder="******" required minLength={6} />
           </div>
           {mode === 'register' && otpSent && (
             <div className="form-group">
