@@ -222,7 +222,7 @@ function SixDayLevelCards({ onSelect }) {
             <li>✅ Basic techniques</li>
           </ul>
           <div className="level-note">⚠️ Warning! This Trainnig Will Make You Beast 💪</div>
-          <button className="btn-outline" style={{ marginTop: '1rem', width: '100%' }} onClick={() => onSelect('advanced')}>Start Workout Plan</button>
+          <button className="btn-outline" style={{ marginTop: '1rem', width: '100%' }} onClick={() => onSelect('advanced')}>See Plan</button>
         </div>
       </div>
     </div>

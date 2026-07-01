@@ -37,7 +37,7 @@ const PLANS = [
     icon: '🏋️',
     title: 'BUY',
     subtitle: 'WORKOUT PLAN',
-    originalPrice: 500,
+    originalPrice: 1500,
     price: 0, // ← change me to your real price (e.g. 99) when going live
     color: '#ff4500',
     features: ['Gym Workout Plan', 'Exercise Guide', 'Sets, Reps & Rest Details', 'For All Fitness Levels'],
@@ -50,7 +50,7 @@ const PLANS = [
     icon: '🥗',
     title: 'BUY',
     subtitle: 'DIET PLAN',
-    originalPrice: 500,
+    originalPrice: 1500,
     price: 5, // ← change me
     color: '#39ff14',
     features: ['Personalized Diet Plan', 'Meal Plan (Veg/Non-Veg)', 'Calorie & Macronutrient Guide', 'Healthy & Effective Nutrition'],
@@ -63,8 +63,8 @@ const PLANS = [
     icon: '🏆',
     title: 'BUY',
     subtitle: 'DIET PLAN + WORKOUT PLAN',
-    originalPrice: 1000,
-    price: 299, // ← change me
+    originalPrice: 2500,
+    price: 449, // ← change me
     color: '#ffd700',
     best: true,
     locked: true,
