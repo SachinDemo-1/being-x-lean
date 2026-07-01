@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /profile
+Disallow: /tracker
+Disallow: /auth
+Disallow: /auth/success
+
+Sitemap: https://www.beingxlean.com/sitemap.xml
