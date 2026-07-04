@@ -508,12 +508,14 @@ export default function Diet() {
   function handleTabClick(tabId) {
     if (tabId === 'standard') { setActiveTab('standard'); return; }
     setActiveTab(tabId);
-    // If we already have a saved plan for this goal, load it straight away
-    // instead of making the user fill the survey out again.
+    // If we have the user's saved survey ANSWERS for this goal, regenerate
+    // the plan fresh from them (using whatever the current meal data is) —
+    // rather than loading a previously computed plan object from cache,
+    // which would go stale the moment BASE_MEALS is ever updated.
     try {
-      const saved = localStorage.getItem(`bxl_diet_plan_${tabId}`);
-      if (saved) {
-        setPlanResult(JSON.parse(saved));
+      const savedAnswers = localStorage.getItem(`bxl_diet_survey_${tabId}`);
+      if (savedAnswers) {
+        handleSurveySubmit({ ...JSON.parse(savedAnswers), goal: tabId });
         return;
       }
     } catch {}
@@ -554,7 +556,6 @@ export default function Diet() {
       // to fill the form again next time they open this goal's tab.
       try {
         localStorage.setItem(`bxl_diet_survey_${goal}`, JSON.stringify(formData));
-        localStorage.setItem(`bxl_diet_plan_${goal}`, JSON.stringify(planData));
       } catch {}
       setActiveTab(goal);
       setShowSurvey(false);
