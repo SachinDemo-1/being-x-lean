@@ -14,15 +14,15 @@ const BASE_MEALS = {
         { name: 'Oats', base: 70, unit: 'g' },
         { name: 'Milk', base: 250, unit: 'ml' },
         { name: 'Banana', base: 1, unit: 'pc', countable: true },
-        { name: 'Peanut Butter', base: 15, unit: 'g' },
-        { name: 'Almonds (Badam)', base: 10, unit: 'g' },
+        { name: 'Peanut Butter', base: 1, unit: 'spoon', countable: true },
+        { name: 'Almonds (Badam) [15-20 pc]', base: 10, unit: 'g' },
       ],
       macros: { protein: 18, carbs: 75, fat: 22, calories: 600 }
     },
     { id: 'meal2', name: 'Lunch', time: '1:00 PM', icon: '🍛',
       items: [
-        { name: 'Rice (cooked)', base: 250, unit: 'g' },
-        { name: 'Sabzi / Vegetables', base: 175, unit: 'g' },
+        { name: 'Rice / Roti', base: 250, unit: 'g' },
+        { name: 'Sabzi (1 Bowl)', base: 100, unit: 'g' },
         { name: 'Chicken', base: 150, unit: 'g', vegAlt: 'Paneer', vegBase: 150, vegUnit: 'g' },
       ],
       macros: { protein: 29, carbs: 65, fat: 10, calories: 550 }
@@ -31,7 +31,6 @@ const BASE_MEALS = {
       items: [
         { name: 'Eggs', base: 5, unit: 'pc', countable: true, vegAlt: 'Soya Chunks', vegBase: 35, vegUnit: 'g', vegCountable: false },
         { name: 'Curd', base: 200, unit: 'g' },
-        { name: 'Chana / Sprouts Dal', base: 100, unit: 'g' },
       ],
       macros: { protein: 23, carbs: 15, fat: 18, calories: 350 }
     },
@@ -40,19 +39,18 @@ const BASE_MEALS = {
         { name: 'Oats', base: 60, unit: 'g' },
         { name: 'Milk', base: 250, unit: 'ml' },
         { name: 'Banana', base: 1, unit: 'pc', countable: true },
-        { name: 'Peanut Butter', base: 10, unit: 'g' },
+        { name: 'Peanut Butter', base: 1, unit: 'spoon', countable: true },
         { name: 'Whey Protein', base: 1, unit: 'scoop', countable: true },
       ],
       macros: { protein: 32, carbs: 65, fat: 14, calories: 600 }
     },
     { id: 'meal5', name: 'Dinner', time: '9:00 PM', icon: '🍲',
       items: [
-        { name: 'Rice (cooked)', base: 200, unit: 'g' },
+        { name: 'Rice / Roti', base: 200, unit: 'g' },
         { name: 'Dal / Rajma / Chana', base: 225, unit: 'g' },
         { name: 'Curd', base: 200, unit: 'g' },
-        { name: 'Sabzi', base: 175, unit: 'g' },
       ],
-      macros: { protein: 17, carbs: 70, fat: 8, calories: 500 }
+      macros: { protein: 17, carbs: 62, fat: 7, calories: 440 }
     },
   ],
   fat_loss: [
