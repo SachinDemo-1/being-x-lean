@@ -345,7 +345,7 @@ function LockedPlanCard({ plan }) {
   );
 }
 // ─── Standard Plan View ─────────────────────────────── ────────────────────────
-function StandardPlanView() {
+function StandardPlanView({ onSelectPlan }) {
   return (
     <div className="diet-standard-view diet-reveal">
       <div className="diet-standard-header">
@@ -356,11 +356,16 @@ function StandardPlanView() {
 
       <div className="diet-standard-cards">
         {[
-          { icon:'💪', title:'Muscle Gain', cal:'2800–3200 kcal', protein:'1.6–2.2g/kg', color:'#ff4500', desc:'Calorie surplus + high protein to build lean mass fast.' },
-          { icon:'🔥', title:'Fat Loss', cal:'TDEE − 300–500', protein:'2.0–2.4g/kg', color:'#39ff14', desc:'Moderate deficit while preserving muscle with high protein.' },
+          { icon:'💪', title:'Muscle Gain', goal:'muscle_gain', cal:'2800–3200 kcal', protein:'1.6–2.2g/kg', color:'#ff4500', desc:'Calorie surplus + high protein to build lean mass fast.' },
+          { icon:'🔥', title:'Fat Loss', goal:'fat_loss', cal:'TDEE − 300–500', protein:'2.0–2.4g/kg', color:'#39ff14', desc:'Moderate deficit while preserving muscle with high protein.' },
           { icon:'⚖️', title:'Body Recompotion', cal:'TDEE + 200–300', protein:'1.8–2.0g/kg', color:'#ffd700', desc:'Slow quality gains with whole foods. 0.25–0.5kg/week.' , locked: true },
         ].map(p => (
-          <div key={p.title} className="diet-std-card" style={{borderColor: p.color + '44' , position: "relative",overflow: "hidden",}}>
+          <div
+            key={p.title}
+            className="diet-std-card"
+            style={{borderColor: p.color + '44', position: "relative", overflow: "hidden", cursor: p.locked ? 'default' : 'pointer'}}
+            onClick={() => { if (!p.locked) onSelectPlan(p.goal); }}
+          >
             <span style={{fontSize:32}}>{p.icon}</span>
             <h3 style={{color: p.color, fontFamily:"'Bebas Neue',cursive", fontSize:'1.6rem', margin:'0.5rem 0'}}>{p.title}</h3>
             <div className="diet-std-row"><span>Calories</span><b>{p.cal}</b></div>
@@ -544,7 +549,7 @@ export default function Diet() {
 
       {/* Main Content */}
       <div className="diet-main-content">
-        {activeTab === 'standard' && <StandardPlanView />}
+        {activeTab === 'standard' && <StandardPlanView onSelectPlan={handleTabClick} />}
         {activeTab !== 'standard' && planResult && (
           <DynamicPlanView
             meals={planResult.meals}
