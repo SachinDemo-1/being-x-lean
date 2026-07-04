@@ -1,27 +1,13 @@
-// Simple localStorage-based plan purchase tracker.
-// Each user's purchases are namespaced by their email (or "guest").
-// Plans: 'workout', 'diet'. Buying the combo unlocks both.
+// Plan purchase tracker — reads/writes plan ownership on the user's own
+// account record (stored in MongoDB via the backend), NOT localStorage.
+// This is what makes a purchase follow the user across devices: logging in
+// on a new phone/browser fetches the same `user.purchases` from the server.
+import axios from 'axios';
 
-const KEY = 'bxl_purchases_v1';
-
-function readAll() {
-  try { return JSON.parse(localStorage.getItem(KEY) || '{}'); }
-  catch { return {}; }
-}
-
-function writeAll(obj) {
-  localStorage.setItem(KEY, JSON.stringify(obj));
-  // Notify same-tab listeners
-  window.dispatchEvent(new Event('bxl-purchases-changed'));
-}
-
-function userKey(user) {
-  return (user && (user.email || user.id)) || 'guest';
-}
+const API = process.env.REACT_APP_API_URL;
 
 export function getPurchases(user) {
-  const all = readAll();
-  return all[userKey(user)] || { workout: false, diet: false };
+  return (user && user.purchases) || { workout: false, diet: false };
 }
 
 export function hasPlan(user, plan) {
@@ -31,20 +17,10 @@ export function hasPlan(user, plan) {
   return false;
 }
 
-export function grantPlan(user, planId) {
-  const all = readAll();
-  const key = userKey(user);
-  const cur = all[key] || { workout: false, diet: false };
-  if (planId === 'workout') cur.workout = true;
-  else if (planId === 'diet') cur.diet = true;
-  else if (planId === 'combo') { cur.workout = true; cur.diet = true; }
-  all[key] = cur;
-  writeAll(all);
-  return cur;
-}
-
-export function resetPurchases(user) {
-  const all = readAll();
-  delete all[userKey(user)];
-  writeAll(all);
+// Persists the purchase on the backend and returns the updated user object
+// (the caller should pass this into setUser(...) from AuthContext so the
+// rest of the app immediately sees the unlocked plan).
+export async function grantPlan(planId) {
+  const res = await axios.put(`${API}/user/purchases`, { planId });
+  return res.data.user;
 }

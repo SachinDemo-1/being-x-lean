@@ -163,7 +163,7 @@ function generatePDF(meals, userInfo, macros, targetCalories, goalLabel) {
 
   // Stats box
   doc.setFillColor(28, 28, 28); doc.roundedRect(margin, 105, cW, 62, 4, 4, 'F');
-  doc.setFillColor(...gold); doc.roundedRect(margin, 105, cW, 9, 4, 4, 'F'); doc.rect(margin, 108, cW, 6, 'F');
+  doc.setFillColor(...gold); doc.roundedRect(margin, 105, cW, 6, 4, 4, 'F'); doc.rect(margin, 108, cW, 3, 'F');
   doc.setTextColor(...dark); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
   doc.text('YOUR STATS', margin + 6, 112);
   const stats = [['Weight', `${userInfo.weight}kg`], ['Height', `${userInfo.height}cm`], ['Age', `${userInfo.age}yrs`], ['Gender', userInfo.gender], ['Diet', userInfo.dietType === 'veg' ? 'Vegetarian' : 'Non-Veg'], ['Activity', userInfo.activity.replace('_', ' ')]];
@@ -176,7 +176,7 @@ function generatePDF(meals, userInfo, macros, targetCalories, goalLabel) {
 
   // Macros box
   doc.setFillColor(28, 28, 28); doc.roundedRect(margin, 178, cW, 52, 4, 4, 'F');
-  doc.setFillColor(...gold); doc.roundedRect(margin, 178, cW, 9, 4, 4, 'F'); doc.rect(margin, 181, cW, 6, 'F');
+  doc.setFillColor(...gold); doc.roundedRect(margin, 178, cW, 6, 4, 4, 'F'); doc.rect(margin, 181, cW, 3, 'F');
   doc.setTextColor(...dark); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text('DAILY TARGETS', margin + 6, 185);
   [['CALORIES', `${targetCalories}`, 'kcal'], ['PROTEIN', `${macros.protein}`, 'g'], ['CARBS', `${macros.carbs}`, 'g'], ['FAT', `${macros.fat}`, 'g']].forEach(([lbl, val, unit], i) => {
     const mx = margin + 6 + i * (cW / 4);
@@ -227,9 +227,9 @@ function generatePDF(meals, userInfo, macros, targetCalories, goalLabel) {
 }
 
 // ─── Survey Modal ─────────────────────────────────────────────────────────────
-function SurveyModal({ planType, onClose, onSubmit, loading }) {
+function SurveyModal({ planType, onClose, onSubmit, loading, initialData }) {
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ weight: '', height: '', age: '', gender: 'male', activity: 'moderate', dietType: 'nonveg' });
+  const [form, setForm] = useState(initialData || { weight: '', height: '', age: '', gender: 'male', activity: 'moderate', dietType: 'nonveg' });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const goalLabel = planType === 'fat_loss' ? 'Fat Loss / Recomp' : 'Muscle Gain';
   const valid1 = form.weight && form.height && form.age;
@@ -415,7 +415,7 @@ function StandardPlanView({ onSelectPlan }) {
 }
 
 // ─── Dynamic Plan View ────────────────────────────────────────────────────────
-function DynamicPlanView({ meals, userInfo, macros, targetCalories, tdee, onDownload }) {
+function DynamicPlanView({ meals, userInfo, macros, targetCalories, tdee, onDownload, onEditSurvey }) {
   const goalLabel = userInfo.goal === 'fat_loss' ? 'Fat Loss' : 'Muscle Gain';
   return (
     <div className="diet-dynamic-view">
@@ -427,7 +427,10 @@ function DynamicPlanView({ meals, userInfo, macros, targetCalories, tdee, onDown
             {userInfo.weight}kg · {userInfo.age}yrs · {userInfo.dietType === 'veg' ? '🥦 Veg' : '🍗 Non-Veg'} · TDEE: {tdee} kcal
           </p>
         </div>
-        <button className="btn-primary" onClick={onDownload} style={{whiteSpace:'nowrap'}}>⬇ Download PDF</button>
+        <div style={{display:'flex', flexDirection:'column', gap:'0.6rem', alignItems:'flex-end'}}>
+          <button className="btn-primary" onClick={onDownload} style={{whiteSpace:'nowrap'}}>⬇ Download PDF</button>
+          <button className="btn-outline" onClick={() => onEditSurvey(userInfo.goal)} style={{whiteSpace:'nowrap'}}>✏️ Edit Details</button>
+        </div>
       </div>
 
       <div className="diet-macro-bar">
@@ -474,11 +477,13 @@ function DynamicPlanView({ meals, userInfo, macros, targetCalories, tdee, onDown
           </div>
         ))}
       </div>
+
+      <div style={{display:'flex', justifyContent:'center', marginTop:'2rem'}}>
+        <button className="btn-primary" onClick={onDownload}>⬇ Download PDF</button>
+      </div>
     </div>
   );
 }
-
-// ─── Main Diet Page ───────────────────────────────────────────────────────────
 export default function Diet() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -504,7 +509,24 @@ export default function Diet() {
 
   function handleTabClick(tabId) {
     if (tabId === 'standard') { setActiveTab('standard'); return; }
+    setActiveTab(tabId);
+    // If we already have a saved plan for this goal, load it straight away
+    // instead of making the user fill the survey out again.
+    try {
+      const saved = localStorage.getItem(`bxl_diet_plan_${tabId}`);
+      if (saved) {
+        setPlanResult(JSON.parse(saved));
+        return;
+      }
+    } catch {}
     setSurveyPlanType(tabId);
+    setShowSurvey(true);
+  }
+
+  // Reopen the survey pre-filled with the last saved answers, so the user
+  // can tweak their details without starting from a blank form.
+  function handleEditSurvey(goal) {
+    setSurveyPlanType(goal);
     setShowSurvey(true);
   }
 
@@ -517,12 +539,25 @@ export default function Diet() {
       const actMult = { sedentary:1.2, light:1.375, moderate:1.55, active:1.725, very_active:1.9 };
       const tdee = Math.round(bmr * (actMult[activity] || 1.55));
       const targetCalories = goal === 'fat_loss' ? tdee - 500 : tdee + 0;
-      const protein = Math.round(w * 1.9);
-      const carbs = Math.round((targetCalories * 0.45) / 4);
-      const fat = Math.round((targetCalories * 0.25) / 9);
       const baseMeals = BASE_MEALS[goal] || BASE_MEALS.muscle_gain;
       const scaledMeals = scaleMeals(baseMeals, targetCalories, formData.dietType === 'veg');
-      setPlanResult({ meals: scaledMeals, userInfo: formData, macros: { protein, carbs, fat }, targetCalories, tdee });
+      // Derive the displayed totals by summing the *actual* per-meal macros
+      // (instead of a separate w*1.9 style formula) so the top numbers
+      // always exactly match what the meal breakdown adds up to.
+      const totals = scaledMeals.reduce((acc, m) => ({
+        protein: acc.protein + m.macros.protein,
+        carbs: acc.carbs + m.macros.carbs,
+        fat: acc.fat + m.macros.fat,
+      }), { protein: 0, carbs: 0, fat: 0 });
+      const macros = totals;
+      const planData = { meals: scaledMeals, userInfo: formData, macros, targetCalories, tdee };
+      setPlanResult(planData);
+      // Save the survey answers + generated plan so the user isn't asked
+      // to fill the form again next time they open this goal's tab.
+      try {
+        localStorage.setItem(`bxl_diet_survey_${goal}`, JSON.stringify(formData));
+        localStorage.setItem(`bxl_diet_plan_${goal}`, JSON.stringify(planData));
+      } catch {}
       setActiveTab(goal);
       setShowSurvey(false);
       setLoading(false);
@@ -558,6 +593,7 @@ export default function Diet() {
             targetCalories={planResult.targetCalories}
             tdee={planResult.tdee}
             onDownload={handleDownload}
+            onEditSurvey={handleEditSurvey}
           />
         )}
         {activeTab !== 'standard' && !planResult && (
@@ -593,6 +629,12 @@ export default function Diet() {
           onClose={() => setShowSurvey(false)}
           onSubmit={handleSurveySubmit}
           loading={loading}
+          initialData={(() => {
+            try {
+              const saved = localStorage.getItem(`bxl_diet_survey_${surveyPlanType}`);
+              return saved ? JSON.parse(saved) : null;
+            } catch { return null; }
+          })()}
         />
       )}
     </div>

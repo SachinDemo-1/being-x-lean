@@ -37,7 +37,7 @@ const PLANS = [
     icon: '🏋️',
     title: 'BUY',
     subtitle: 'WORKOUT PLAN',
-    originalPrice: 1500,
+    originalPrice: 500,
     price: 0, // ← change me to your real price (e.g. 99) when going live
     color: '#ff4500',
     features: ['Gym Workout Plan', 'Exercise Guide', 'Sets, Reps & Rest Details', 'For All Fitness Levels'],
@@ -50,7 +50,7 @@ const PLANS = [
     icon: '🥗',
     title: 'BUY',
     subtitle: 'DIET PLAN',
-    originalPrice: 1500,
+    originalPrice: 500,
     price: 5, // ← change me
     color: '#39ff14',
     features: ['Personalized Diet Plan', 'Meal Plan (Veg/Non-Veg)', 'Calorie & Macronutrient Guide', 'Healthy & Effective Nutrition'],
@@ -63,8 +63,8 @@ const PLANS = [
     icon: '🏆',
     title: 'BUY',
     subtitle: 'DIET PLAN + WORKOUT PLAN',
-    originalPrice: 2500,
-    price: 449, // ← change me
+    originalPrice: 1000,
+    price: 299, // ← change me
     color: '#ffd700',
     best: true,
     locked: true,
@@ -76,7 +76,7 @@ const PLANS = [
 ];
 
 export default function Pricing() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(null);
@@ -96,9 +96,14 @@ export default function Pricing() {
 
     // FREE / TEST MODE — instantly unlock without payment.
     if (TEST_MODE_FREE || plan.price === 0) {
-      grantPlan(user, plan.unlocks);
-      alert(`✅ ${plan.subtitle} unlocked (test mode). Opening your plan…`);
-      navigate(plan.goTo);
+      try {
+        const updatedUser = await grantPlan(plan.unlocks);
+        setUser(updatedUser);
+        alert(`✅ ${plan.subtitle} unlocked (test mode). Opening your plan…`);
+        navigate(plan.goTo);
+      } catch (e) {
+        alert('Something went wrong unlocking your plan. Please try again.');
+      }
       return;
     }
 
@@ -113,9 +118,14 @@ export default function Pricing() {
       description: plan.subtitle,
       prefill: { name: user.name || '', email: user.email || '' },
       theme: { color: plan.color },
-      handler: function(response) {
-        grantPlan(user, plan.unlocks);
-        alert(`✅ Payment successful! ID: ${response.razorpay_payment_id}\n${plan.subtitle} unlocked.`);
+      handler: async function(response) {
+        try {
+          const updatedUser = await grantPlan(plan.unlocks);
+          setUser(updatedUser);
+          alert(`✅ Payment successful! ID: ${response.razorpay_payment_id}\n${plan.subtitle} unlocked.`);
+        } catch (e) {
+          alert('Payment succeeded but we could not save your unlock. Please contact support with this payment ID: ' + response.razorpay_payment_id);
+        }
         setLoading(null);
         navigate(plan.goTo);
       },

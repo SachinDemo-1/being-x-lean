@@ -37,4 +37,23 @@ router.put('/profile', protect, async (req, res) => {
   }
 });
 
+// Grant a plan purchase (called after successful payment / test-mode unlock)
+router.put('/purchases', protect, async (req, res) => {
+  try {
+    const { planId } = req.body; // 'workout' | 'diet' | 'combo'
+    if (!['workout', 'diet', 'combo'].includes(planId)) {
+      return res.status(400).json({ message: 'Invalid planId' });
+    }
+    if (!req.user.purchases) req.user.purchases = { workout: false, diet: false };
+    if (planId === 'workout') req.user.purchases.workout = true;
+    else if (planId === 'diet') req.user.purchases.diet = true;
+    else if (planId === 'combo') { req.user.purchases.workout = true; req.user.purchases.diet = true; }
+    req.user.markModified('purchases');
+    await req.user.save();
+    res.json({ user: req.user });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 export default router;
