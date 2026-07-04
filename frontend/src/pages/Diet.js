@@ -15,21 +15,21 @@ const BASE_MEALS = {
         { name: 'Milk', base: 250, unit: 'ml' },
         { name: 'Banana', base: 1, unit: 'pc', countable: true },
         { name: 'Peanut Butter', base: 1, unit: 'spoon', countable: true },
-        { name: 'Almonds (Badam) [15-20 pc]', base: 10, unit: 'g' },
+        { name: 'Almonds (Badam) [15-20 pc]', base: 18, unit: 'g' },
       ],
       macros: { protein: 18, carbs: 75, fat: 22, calories: 600 }
     },
     { id: 'meal2', name: 'Lunch', time: '1:00 PM', icon: '🍛',
       items: [
         { name: 'Rice / Roti', base: 250, unit: 'g' },
-        { name: 'Sabzi (1 Bowl)', base: 100, unit: 'g' },
-        { name: 'Chicken', base: 150, unit: 'g', vegAlt: 'Paneer', vegBase: 150, vegUnit: 'g' },
+        { name: 'Sabzi (1 Bowl)', base: 175, unit: 'g' },
+        { name: 'Chicken', base: 100, unit: 'g', vegAlt: 'Paneer', vegBase: 100, vegUnit: 'g' },
       ],
       macros: { protein: 29, carbs: 65, fat: 10, calories: 550 }
     },
     { id: 'meal3', name: 'Evening Snack', time: '4:30 PM', icon: '🥚',
       items: [
-        { name: 'Eggs', base: 5, unit: 'pc', countable: true, vegAlt: 'Soya Chunks', vegBase: 35, vegUnit: 'g', vegCountable: false },
+        { name: 'Soya Chunks', base: 30, unit: 'g' },
         { name: 'Curd', base: 200, unit: 'g' },
       ],
       macros: { protein: 23, carbs: 15, fat: 18, calories: 350 }
