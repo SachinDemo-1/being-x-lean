@@ -14,44 +14,45 @@ const BASE_MEALS = {
         { name: 'Oats', base: 70, unit: 'g' },
         { name: 'Milk', base: 250, unit: 'ml' },
         { name: 'Banana', base: 1, unit: 'pc', countable: true },
-        { name: 'Peanut Butter', base: 1, unit: 'spoon', countable: true },
-        { name: 'Almonds (Badam) [15-20 pc]', base: 18, unit: 'g' },
+        { name: 'Peanut Butter', base: 15, unit: 'g' },
+        { name: 'Almonds (Badam)', base: 10, unit: 'g' },
       ],
-      macros: { protein: 29, carbs: 92, fat: 30, calories: 729 }
+      macros: { protein: 18, carbs: 75, fat: 22, calories: 600 }
     },
     { id: 'meal2', name: 'Lunch', time: '1:00 PM', icon: '🍛',
       items: [
-        { name: 'Rice / Roti', base: 250, unit: 'g' },
-        { name: 'Sabzi (1 Bowl)', base: 175, unit: 'g' },
-        { name: 'Chicken', base: 150, unit: 'g', vegAlt: 'Paneer', vegBase: 150 },
+        { name: 'Rice (cooked)', base: 250, unit: 'g' },
+        { name: 'Sabzi / Vegetables', base: 175, unit: 'g' },
+        { name: 'Chicken', base: 150, unit: 'g', vegAlt: 'Paneer', vegBase: 150, vegUnit: 'g' },
       ],
-      macros: { protein: 38, carbs: 65, fat: 10, calories: 550 }
+      macros: { protein: 29, carbs: 65, fat: 10, calories: 550 }
     },
     { id: 'meal3', name: 'Evening Snack', time: '4:30 PM', icon: '🥚',
       items: [
-        { name: 'Eggs', base: 5, unit: 'pc', countable: true, vegAlt: 'Soya Chunks', vegBase: 30 },
+        { name: 'Eggs', base: 5, unit: 'pc', countable: true, vegAlt: 'Soya Chunks', vegBase: 35, vegUnit: 'g', vegCountable: false },
         { name: 'Curd', base: 200, unit: 'g' },
-        { name: 'Almonds', base: 15, unit: 'g' },
+        { name: 'Chana / Sprouts Dal', base: 100, unit: 'g' },
       ],
-      macros: { protein: 30, carbs: 15, fat: 18, calories: 350 }
+      macros: { protein: 23, carbs: 15, fat: 18, calories: 350 }
     },
     { id: 'meal4', name: 'Pre/Post Workout Shake', time: '7:00 PM', icon: '💪',
       items: [
         { name: 'Oats', base: 60, unit: 'g' },
         { name: 'Milk', base: 250, unit: 'ml' },
         { name: 'Banana', base: 1, unit: 'pc', countable: true },
-        { name: 'Peanut Butter', base: 1, unit: 'spoon', countable: true },
+        { name: 'Peanut Butter', base: 10, unit: 'g' },
         { name: 'Whey Protein', base: 1, unit: 'scoop', countable: true },
       ],
-      macros: { protein: 47, carbs: 85, fat: 22, calories: 706 }
+      macros: { protein: 32, carbs: 65, fat: 14, calories: 600 }
     },
     { id: 'meal5', name: 'Dinner', time: '9:00 PM', icon: '🍲',
       items: [
-        { name: 'Rice / Roti', base: 200, unit: 'g' },
+        { name: 'Rice (cooked)', base: 200, unit: 'g' },
         { name: 'Dal / Rajma / Chana', base: 225, unit: 'g' },
         { name: 'Curd', base: 200, unit: 'g' },
+        { name: 'Sabzi', base: 175, unit: 'g' },
       ],
-      macros: { protein: 32, carbs: 107, fat: 10, calories: 641 }
+      macros: { protein: 17, carbs: 70, fat: 8, calories: 500 }
     },
   ],
   fat_loss: [
@@ -65,7 +66,7 @@ const BASE_MEALS = {
     },
     { id: 'meal2', name: 'Mid Morning', time: '10:30 AM', icon: '🥗',
       items: [
-        { name: 'Boiled Eggs', base: 3, unit: 'pc', countable: true, vegAlt: 'Paneer', vegBase: 100 },
+        { name: 'Boiled Eggs', base: 3, unit: 'pc', countable: true, vegAlt: 'Paneer', vegBase: 100, vegUnit: 'g', vegCountable: false },
         { name: 'Salad', base: 150, unit: 'g' },
       ],
       macros: { protein: 20, carbs: 5, fat: 10, calories: 200 }
@@ -75,7 +76,7 @@ const BASE_MEALS = {
         { name: 'Brown Rice', base: 150, unit: 'g' },
         { name: 'Dal', base: 200, unit: 'g' },
         { name: 'Salad', base: 150, unit: 'g' },
-        { name: 'Grilled Chicken', base: 120, unit: 'g', vegAlt: 'Soya Chunks', vegBase: 40 },
+        { name: 'Grilled Chicken', base: 120, unit: 'g', vegAlt: 'Soya Chunks', vegBase: 40, vegUnit: 'g' },
       ],
       macros: { protein: 35, carbs: 50, fat: 8, calories: 420 }
     },
@@ -88,7 +89,7 @@ const BASE_MEALS = {
     },
     { id: 'meal5', name: 'Dinner', time: '8:00 PM', icon: '🥣',
       items: [
-        { name: 'Grilled Chicken', base: 150, unit: 'g', vegAlt: 'Paneer', vegBase: 150 },
+        { name: 'Grilled Chicken', base: 150, unit: 'g', vegAlt: 'Paneer', vegBase: 150, vegUnit: 'g' },
         { name: 'Vegetable Soup', base: 250, unit: 'ml' },
         { name: 'Sabzi (light)', base: 200, unit: 'g' },
       ],
@@ -97,17 +98,26 @@ const BASE_MEALS = {
   ],
 };
 
-// ─── Scale meals by calorie ratio ─────────────────────────────────────────────
-function scaleMeals(meals, targetCalories) {
+function roundToNearest50(value) {
+  return Math.round(value / 50) * 50;
+}
+
+// ─── Scale meals by calorie ratio (diet-type aware) ───────────────────────────
+function scaleMeals(meals, targetCalories, isVeg) {
   const ratio = targetCalories / BASE_CALORIES;
   return meals.map(meal => ({
     ...meal,
-    items: meal.items.map(item => ({
-      ...item,
-      amount: item.countable
-        ? Math.max(1, Math.round(item.base * ratio))
-        : Math.round(item.base * ratio),
-    })),
+    items: meal.items.map(item => {
+      const useVeg = isVeg && item.vegAlt;
+      const name = useVeg ? item.vegAlt : item.name;
+      const base = useVeg ? item.vegBase : item.base;
+      const unit = useVeg ? (item.vegUnit || item.unit) : item.unit;
+      const countable = useVeg ? !!item.vegCountable : !!item.countable;
+      const amount = countable
+        ? Math.max(1, Math.round(base * ratio))
+        : Math.max(50, roundToNearest50(base * ratio));
+      return { ...item, name, unit, countable, amount };
+    }),
     macros: {
       protein: Math.round(meal.macros.protein * ratio),
       carbs: Math.round(meal.macros.carbs * ratio),
@@ -154,7 +164,7 @@ function generatePDF(meals, userInfo, macros, targetCalories, goalLabel) {
   // Stats box
   doc.setFillColor(28, 28, 28); doc.roundedRect(margin, 105, cW, 62, 4, 4, 'F');
   doc.setFillColor(...gold); doc.roundedRect(margin, 105, cW, 6, 4, 4, 'F'); doc.rect(margin, 108, cW, 3, 'F');
-  doc.setTextColor(...gold); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+  doc.setTextColor(...dark); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
   doc.text('YOUR STATS', margin + 6, 112);
   const stats = [['Weight', `${userInfo.weight}kg`], ['Height', `${userInfo.height}cm`], ['Age', `${userInfo.age}yrs`], ['Gender', userInfo.gender], ['Diet', userInfo.dietType === 'veg' ? 'Vegetarian' : 'Non-Veg'], ['Activity', userInfo.activity.replace('_', ' ')]];
   const cw = cW / 3;
@@ -167,7 +177,7 @@ function generatePDF(meals, userInfo, macros, targetCalories, goalLabel) {
   // Macros box
   doc.setFillColor(28, 28, 28); doc.roundedRect(margin, 178, cW, 52, 4, 4, 'F');
   doc.setFillColor(...gold); doc.roundedRect(margin, 178, cW, 6, 4, 4, 'F'); doc.rect(margin, 181, cW, 3, 'F');
-  doc.setTextColor(...gold); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text('DAILY TARGETS', margin + 6, 185);
+  doc.setTextColor(...dark); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text('DAILY TARGETS', margin + 6, 185);
   [['CALORIES', `${targetCalories}`, 'kcal'], ['PROTEIN', `${macros.protein}`, 'g'], ['CARBS', `${macros.carbs}`, 'g'], ['FAT', `${macros.fat}`, 'g']].forEach(([lbl, val, unit], i) => {
     const mx = margin + 6 + i * (cW / 4);
     doc.setTextColor(...gray); doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.text(lbl, mx, 198);
@@ -195,8 +205,7 @@ function generatePDF(meals, userInfo, macros, targetCalories, goalLabel) {
 
     meal.items.forEach(item => {
       checkBreak(8);
-      const isVeg = userInfo.dietType === 'veg';
-      const nm = isVeg && item.vegAlt ? item.vegAlt : item.name;
+      const nm = item.name;
       const qty = item.amount;
       doc.setFillColor(240, 240, 240); doc.rect(margin + 4, y, cW - 4, 7, 'F');
       doc.setFillColor(...gold); doc.circle(margin + 7.5, y + 3.5, 1, 'F');
@@ -218,9 +227,9 @@ function generatePDF(meals, userInfo, macros, targetCalories, goalLabel) {
 }
 
 // ─── Survey Modal ─────────────────────────────────────────────────────────────
-function SurveyModal({ planType, onClose, onSubmit, loading }) {
+function SurveyModal({ planType, onClose, onSubmit, loading, initialData }) {
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ weight: '', height: '', age: '', gender: 'male', activity: 'moderate', dietType: 'nonveg' });
+  const [form, setForm] = useState(initialData || { weight: '', height: '', age: '', gender: 'male', activity: 'moderate', dietType: 'nonveg' });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const goalLabel = planType === 'fat_loss' ? 'Fat Loss / Recomp' : 'Muscle Gain';
   const valid1 = form.weight && form.height && form.age;
@@ -336,7 +345,7 @@ function LockedPlanCard({ plan }) {
   );
 }
 // ─── Standard Plan View ─────────────────────────────── ────────────────────────
-function StandardPlanView() {
+function StandardPlanView({ onSelectPlan }) {
   return (
     <div className="diet-standard-view diet-reveal">
       <div className="diet-standard-header">
@@ -347,11 +356,16 @@ function StandardPlanView() {
 
       <div className="diet-standard-cards">
         {[
-          { icon:'💪', title:'Muscle Gain', cal:'2800–3200 kcal', protein:'1.6–2.2g/kg', color:'#ff4500', desc:'Calorie surplus + high protein to build lean mass fast.' },
-          { icon:'🔥', title:'Fat Loss', cal:'TDEE − 300–500', protein:'2.0–2.4g/kg', color:'#39ff14', desc:'Moderate deficit while preserving muscle with high protein.' },
+          { icon:'💪', title:'Muscle Gain', goal:'muscle_gain', cal:'2800–3200 kcal', protein:'1.6–2.2g/kg', color:'#ff4500', desc:'Calorie surplus + high protein to build lean mass fast.' },
+          { icon:'🔥', title:'Fat Loss', goal:'fat_loss', cal:'TDEE − 300–500', protein:'2.0–2.4g/kg', color:'#39ff14', desc:'Moderate deficit while preserving muscle with high protein.' },
           { icon:'⚖️', title:'Body Recompotion', cal:'TDEE + 200–300', protein:'1.8–2.0g/kg', color:'#ffd700', desc:'Slow quality gains with whole foods. 0.25–0.5kg/week.' , locked: true },
         ].map(p => (
-          <div key={p.title} className="diet-std-card" style={{borderColor: p.color + '44' , position: "relative",overflow: "hidden",}}>
+          <div
+            key={p.title}
+            className="diet-std-card"
+            style={{borderColor: p.color + '44', position: "relative", overflow: "hidden", cursor: p.locked ? 'default' : 'pointer'}}
+            onClick={() => { if (!p.locked) onSelectPlan(p.goal); }}
+          >
             <span style={{fontSize:32}}>{p.icon}</span>
             <h3 style={{color: p.color, fontFamily:"'Bebas Neue',cursive", fontSize:'1.6rem', margin:'0.5rem 0'}}>{p.title}</h3>
             <div className="diet-std-row"><span>Calories</span><b>{p.cal}</b></div>
@@ -401,7 +415,7 @@ function StandardPlanView() {
 }
 
 // ─── Dynamic Plan View ────────────────────────────────────────────────────────
-function DynamicPlanView({ meals, userInfo, macros, targetCalories, tdee, onDownload }) {
+function DynamicPlanView({ meals, userInfo, macros, targetCalories, tdee, onDownload, onEditSurvey }) {
   const goalLabel = userInfo.goal === 'fat_loss' ? 'Fat Loss' : 'Muscle Gain';
   return (
     <div className="diet-dynamic-view">
@@ -413,7 +427,10 @@ function DynamicPlanView({ meals, userInfo, macros, targetCalories, tdee, onDown
             {userInfo.weight}kg · {userInfo.age}yrs · {userInfo.dietType === 'veg' ? '🥦 Veg' : '🍗 Non-Veg'} · TDEE: {tdee} kcal
           </p>
         </div>
-        <button className="btn-primary" onClick={onDownload} style={{whiteSpace:'nowrap'}}>⬇ Download PDF</button>
+        <div style={{display:'flex', flexDirection:'column', gap:'0.6rem', alignItems:'flex-end'}}>
+          <button className="btn-primary" onClick={onDownload} style={{whiteSpace:'nowrap'}}>⬇ Download PDF</button>
+          <button className="btn-outline" onClick={() => onEditSurvey(userInfo.goal)} style={{whiteSpace:'nowrap'}}>✏️ Edit Details</button>
+        </div>
       </div>
 
       <div className="diet-macro-bar">
@@ -442,16 +459,12 @@ function DynamicPlanView({ meals, userInfo, macros, targetCalories, tdee, onDown
               <span style={{fontSize:24, marginLeft:'auto'}}>{meal.icon}</span>
             </div>
             <div className="diet-meal-block-items">
-              {meal.items.map((item, i) => {
-                const isVeg = userInfo.dietType === 'veg';
-                const nm = isVeg && item.vegAlt ? item.vegAlt : item.name;
-                return (
-                  <div key={i} className="diet-meal-row">
-                    <span>{nm}</span>
-                    <span className="diet-meal-qty">{item.amount} {item.unit}</span>
-                  </div>
-                );
-              })}
+              {meal.items.map((item, i) => (
+                <div key={i} className="diet-meal-row">
+                  <span>{item.name}</span>
+                  <span className="diet-meal-qty">{item.amount} {item.unit}</span>
+                </div>
+              ))}
             </div>
             <div className="diet-meal-block-macros">
               {[['P',meal.macros.protein,'g','#00bfff'],['C',meal.macros.carbs,'g','#ffd700'],['F',meal.macros.fat,'g','#39ff14'],['~',meal.macros.calories,'kcal','var(--accent)']].map(([l,v,u,c])=>(
@@ -464,11 +477,13 @@ function DynamicPlanView({ meals, userInfo, macros, targetCalories, tdee, onDown
           </div>
         ))}
       </div>
+
+      <div style={{display:'flex', justifyContent:'center', marginTop:'2rem'}}>
+        <button className="btn-primary" onClick={onDownload}>⬇ Download PDF</button>
+      </div>
     </div>
   );
 }
-
-// ─── Main Diet Page ───────────────────────────────────────────────────────────
 export default function Diet() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -479,8 +494,8 @@ export default function Diet() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!user) { navigate('/auth'); return; }
-    if (!hasPlan(user, 'diet')) { navigate('/pricing'); return; }
+    if (!user) { navigate('/auth', { replace: true }); return; }
+    if (!hasPlan(user, 'diet')) { navigate('/pricing?for=diet', { replace: true }); return; }
   }, [user, navigate]);
 
   useEffect(() => {
@@ -494,7 +509,24 @@ export default function Diet() {
 
   function handleTabClick(tabId) {
     if (tabId === 'standard') { setActiveTab('standard'); return; }
+    setActiveTab(tabId);
+    // If we already have a saved plan for this goal, load it straight away
+    // instead of making the user fill the survey out again.
+    try {
+      const saved = localStorage.getItem(`bxl_diet_plan_${tabId}`);
+      if (saved) {
+        setPlanResult(JSON.parse(saved));
+        return;
+      }
+    } catch {}
     setSurveyPlanType(tabId);
+    setShowSurvey(true);
+  }
+
+  // Reopen the survey pre-filled with the last saved answers, so the user
+  // can tweak their details without starting from a blank form.
+  function handleEditSurvey(goal) {
+    setSurveyPlanType(goal);
     setShowSurvey(true);
   }
 
@@ -506,13 +538,26 @@ export default function Diet() {
       let bmr = gender === 'male' ? 10*w + 6.25*h - 5*a + 5 : 10*w + 6.25*h - 5*a - 161;
       const actMult = { sedentary:1.2, light:1.375, moderate:1.55, active:1.725, very_active:1.9 };
       const tdee = Math.round(bmr * (actMult[activity] || 1.55));
-      const targetCalories = goal === 'fat_loss' ? tdee - 400 : tdee + 300;
-      const protein = Math.round(w * 1.9);
-      const carbs = Math.round((targetCalories * 0.45) / 4);
-      const fat = Math.round((targetCalories * 0.25) / 9);
+      const targetCalories = goal === 'fat_loss' ? tdee - 500 : tdee + 0;
       const baseMeals = BASE_MEALS[goal] || BASE_MEALS.muscle_gain;
-      const scaledMeals = scaleMeals(baseMeals, targetCalories);
-      setPlanResult({ meals: scaledMeals, userInfo: formData, macros: { protein, carbs, fat }, targetCalories, tdee });
+      const scaledMeals = scaleMeals(baseMeals, targetCalories, formData.dietType === 'veg');
+      // Derive the displayed totals by summing the *actual* per-meal macros
+      // (instead of a separate w*1.9 style formula) so the top numbers
+      // always exactly match what the meal breakdown adds up to.
+      const totals = scaledMeals.reduce((acc, m) => ({
+        protein: acc.protein + m.macros.protein,
+        carbs: acc.carbs + m.macros.carbs,
+        fat: acc.fat + m.macros.fat,
+      }), { protein: 0, carbs: 0, fat: 0 });
+      const macros = totals;
+      const planData = { meals: scaledMeals, userInfo: formData, macros, targetCalories, tdee };
+      setPlanResult(planData);
+      // Save the survey answers + generated plan so the user isn't asked
+      // to fill the form again next time they open this goal's tab.
+      try {
+        localStorage.setItem(`bxl_diet_survey_${goal}`, JSON.stringify(formData));
+        localStorage.setItem(`bxl_diet_plan_${goal}`, JSON.stringify(planData));
+      } catch {}
       setActiveTab(goal);
       setShowSurvey(false);
       setLoading(false);
@@ -539,7 +584,7 @@ export default function Diet() {
 
       {/* Main Content */}
       <div className="diet-main-content">
-        {activeTab === 'standard' && <StandardPlanView />}
+        {activeTab === 'standard' && <StandardPlanView onSelectPlan={handleTabClick} />}
         {activeTab !== 'standard' && planResult && (
           <DynamicPlanView
             meals={planResult.meals}
@@ -548,6 +593,7 @@ export default function Diet() {
             targetCalories={planResult.targetCalories}
             tdee={planResult.tdee}
             onDownload={handleDownload}
+            onEditSurvey={handleEditSurvey}
           />
         )}
         {activeTab !== 'standard' && !planResult && (
@@ -583,6 +629,12 @@ export default function Diet() {
           onClose={() => setShowSurvey(false)}
           onSubmit={handleSurveySubmit}
           loading={loading}
+          initialData={(() => {
+            try {
+              const saved = localStorage.getItem(`bxl_diet_survey_${surveyPlanType}`);
+              return saved ? JSON.parse(saved) : null;
+            } catch { return null; }
+          })()}
         />
       )}
     </div>
