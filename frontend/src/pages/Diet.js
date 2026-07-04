@@ -4,13 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import { hasPlan } from '../context/purchases';
 import './Diet.css';
 
-const BASE_CALORIES = 2995;
+const BASE_CALORIES = 2700;
 
-// ─── Base meal plans (60kg / 2995kcal reference) ─────────────────────────────
-// Every gram/ml value below was computed from standard nutrition data for each
-// ingredient (oats, milk, banana, peanut butter, almonds, rice, sabzi, paneer/
-// chicken, soya chunks, curd, dal) so the protein/carbs/fat/calories per meal
-// are the real totals of the listed quantities — not placeholders.
+// ─── Base meal plans (60kg / 2700kcal reference) ─────────────────────────────
 const BASE_MEALS = {
   muscle_gain: [
     { id: 'meal1', name: 'Morning Shake', time: '7:00 AM', icon: '🥤',
@@ -29,16 +25,17 @@ const BASE_MEALS = {
         { name: 'Sabzi (1 Bowl)', base: 175, unit: 'g' },
         { name: 'Chicken', base: 150, unit: 'g', vegAlt: 'Paneer', vegBase: 150 },
       ],
-      macros: { protein: 57, carbs: 84, fat: 11, calories: 695 }
+      macros: { protein: 38, carbs: 65, fat: 10, calories: 550 }
     },
-    { id: 'meal3', name: 'Evening Snack', time: '4:30 PM', icon: '🥣',
+    { id: 'meal3', name: 'Evening Snack', time: '4:30 PM', icon: '🥚',
       items: [
-        { name: 'Soya Chunks', base: 30, unit: 'g' },
+        { name: 'Eggs', base: 5, unit: 'pc', countable: true, vegAlt: 'Soya Chunks', vegBase: 30 },
         { name: 'Curd', base: 200, unit: 'g' },
+        { name: 'Almonds', base: 15, unit: 'g' },
       ],
-      macros: { protein: 22, carbs: 16, fat: 9, calories: 224 }
+      macros: { protein: 30, carbs: 15, fat: 18, calories: 350 }
     },
-    { id: 'meal4', name: 'Pre/Post Workout Snack', time: '7:00 PM', icon: '💪',
+    { id: 'meal4', name: 'Pre/Post Workout Shake', time: '7:00 PM', icon: '💪',
       items: [
         { name: 'Oats', base: 60, unit: 'g' },
         { name: 'Milk', base: 250, unit: 'ml' },
