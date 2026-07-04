@@ -17,7 +17,7 @@ const BASE_MEALS = {
         { name: 'Peanut Butter', base: 15, unit: 'g' },
         { name: 'Almonds (Badam)', base: 10, unit: 'g' },
       ],
-      macros: { protein: 24, carbs: 75, fat: 22, calories: 600 }
+      macros: { protein: 18, carbs: 75, fat: 22, calories: 600 }
     },
     { id: 'meal2', name: 'Lunch', time: '1:00 PM', icon: '🍛',
       items: [
@@ -25,7 +25,7 @@ const BASE_MEALS = {
         { name: 'Sabzi / Vegetables', base: 175, unit: 'g' },
         { name: 'Chicken', base: 150, unit: 'g', vegAlt: 'Paneer', vegBase: 150, vegUnit: 'g' },
       ],
-      macros: { protein: 38, carbs: 65, fat: 10, calories: 550 }
+      macros: { protein: 29, carbs: 65, fat: 10, calories: 550 }
     },
     { id: 'meal3', name: 'Evening Snack', time: '4:30 PM', icon: '🥚',
       items: [
@@ -33,7 +33,7 @@ const BASE_MEALS = {
         { name: 'Curd', base: 200, unit: 'g' },
         { name: 'Chana / Sprouts Dal', base: 100, unit: 'g' },
       ],
-      macros: { protein: 30, carbs: 15, fat: 18, calories: 350 }
+      macros: { protein: 23, carbs: 15, fat: 18, calories: 350 }
     },
     { id: 'meal4', name: 'Pre/Post Workout Shake', time: '7:00 PM', icon: '💪',
       items: [
@@ -43,7 +43,7 @@ const BASE_MEALS = {
         { name: 'Peanut Butter', base: 10, unit: 'g' },
         { name: 'Whey Protein', base: 1, unit: 'scoop', countable: true },
       ],
-      macros: { protein: 42, carbs: 65, fat: 14, calories: 600 }
+      macros: { protein: 32, carbs: 65, fat: 14, calories: 600 }
     },
     { id: 'meal5', name: 'Dinner', time: '9:00 PM', icon: '🍲',
       items: [
@@ -52,7 +52,7 @@ const BASE_MEALS = {
         { name: 'Curd', base: 200, unit: 'g' },
         { name: 'Sabzi', base: 175, unit: 'g' },
       ],
-      macros: { protein: 22, carbs: 70, fat: 8, calories: 500 }
+      macros: { protein: 17, carbs: 70, fat: 8, calories: 500 }
     },
   ],
   fat_loss: [
