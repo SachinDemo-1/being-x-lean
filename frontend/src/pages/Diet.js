@@ -100,12 +100,54 @@ function roundToNearest50(value) {
   return Math.round(value / 50) * 50;
 }
 
+// ─── Real nutrition data (per 100g/ml, or per single unit for countable items) ─
+// Source: standard USDA-style reference values. This is what makes macros
+// mathematically consistent — every number below is calculated FROM the
+// actual ingredient + quantity shown, not a separately hand-typed guess.
+const NUTRITION = {
+  'Oats':                              { per100: { p: 16,  c: 66, f: 7,   cal: 389 } },
+  'Milk':                              { per100: { p: 3.2, c: 4.8, f: 3,  cal: 60  } },
+  'Milk (low fat)':                    { per100: { p: 3.4, c: 5,  f: 1.5, cal: 47  } },
+  'Almonds (Badam) [15-20 pc]':        { per100: { p: 21,  c: 22, f: 50,  cal: 579 } },
+  'Rice / Roti':                       { per100: { p: 3,   c: 22, f: 2,   cal: 115 } },
+  'Brown Rice':                        { per100: { p: 2.6, c: 23, f: 0.9, cal: 111 } },
+  'Sabzi (1 Bowl)':                    { per100: { p: 2,   c: 8,  f: 3,   cal: 70  } },
+  'Sabzi (light)':                     { per100: { p: 2,   c: 6,  f: 2,   cal: 55  } },
+  'Chicken':                           { per100: { p: 31,  c: 0,  f: 3.6, cal: 165 } },
+  'Grilled Chicken':                   { per100: { p: 31,  c: 0,  f: 3.6, cal: 165 } },
+  'Paneer':                            { per100: { p: 18,  c: 1.2, f: 20, cal: 265 } },
+  'Soya Chunks':                       { per100: { p: 52,  c: 33, f: 0.5, cal: 345 } },
+  'Curd':                              { per100: { p: 3.5, c: 4,  f: 4,   cal: 60  } },
+  'Dal / Rajma / Chana':               { per100: { p: 7,   c: 20, f: 1,   cal: 120 } },
+  'Dal':                               { per100: { p: 7,   c: 20, f: 1,   cal: 120 } },
+  'Salad':                             { per100: { p: 1.5, c: 5,  f: 0.2, cal: 25  } },
+  'Mixed Nuts':                        { per100: { p: 20,  c: 20, f: 50,  cal: 600 } },
+  'Vegetable Soup':                    { per100: { p: 1,   c: 5,  f: 0.5, cal: 30  } },
+  // Countable / per-single-unit items
+  'Banana':                            { perUnit: { p: 1.3, c: 27, f: 0.3, cal: 105 } },
+  'Peanut Butter':                     { perUnit: { p: 4,   c: 3,  f: 8,   cal: 94  } },
+  'Whey Protein':                      { perUnit: { p: 24,  c: 3,  f: 1.5, cal: 120 } },
+  'Boiled Eggs':                       { perUnit: { p: 6,   c: 0.6, f: 5,  cal: 78  } },
+  'Green Tea':                         { perUnit: { p: 0,   c: 0,  f: 0,   cal: 2   } },
+};
+
+function computeItemMacros(name, amount, isCountable) {
+  const entry = NUTRITION[name];
+  if (!entry) return { protein: 0, carbs: 0, fat: 0, calories: 0 };
+  if (isCountable && entry.perUnit) {
+    const u = entry.perUnit;
+    return { protein: u.p * amount, carbs: u.c * amount, fat: u.f * amount, calories: u.cal * amount };
+  }
+  const ref = entry.per100 || entry.perUnit;
+  const factor = amount / 100;
+  return { protein: ref.p * factor, carbs: ref.c * factor, fat: ref.f * factor, calories: ref.cal * factor };
+}
+
 // ─── Scale meals by calorie ratio (diet-type aware) ───────────────────────────
 function scaleMeals(meals, targetCalories, isVeg) {
   const ratio = targetCalories / BASE_CALORIES;
-  return meals.map(meal => ({
-    ...meal,
-    items: meal.items.map(item => {
+  return meals.map(meal => {
+    const items = meal.items.map(item => {
       const useVeg = isVeg && item.vegAlt;
       const name = useVeg ? item.vegAlt : item.name;
       const base = useVeg ? item.vegBase : item.base;
@@ -114,19 +156,32 @@ function scaleMeals(meals, targetCalories, isVeg) {
       const amount = countable
         ? Math.max(1, Math.round(base * ratio))
         : Math.max(50, roundToNearest50(base * ratio));
-      return { ...item, name, unit, countable, amount };
-    }),
-    macros: {
-      protein: Math.round(meal.macros.protein * ratio),
-      carbs: Math.round(meal.macros.carbs * ratio),
-      fat: Math.round(meal.macros.fat * ratio),
-      calories: Math.round(meal.macros.calories * ratio),
-    },
-  }));
+      const macros = computeItemMacros(name, amount, countable);
+      return { ...item, name, unit, countable, amount, macros };
+    });
+    // Meal totals are the actual SUM of the ingredient rows above —
+    // never a separate hand-typed estimate — so the two can never disagree.
+    const macros = items.reduce((acc, it) => ({
+      protein: acc.protein + it.macros.protein,
+      carbs: acc.carbs + it.macros.carbs,
+      fat: acc.fat + it.macros.fat,
+      calories: acc.calories + it.macros.calories,
+    }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
+    return {
+      ...meal,
+      items,
+      macros: {
+        protein: Math.round(macros.protein),
+        carbs: Math.round(macros.carbs),
+        fat: Math.round(macros.fat),
+        calories: Math.round(macros.calories),
+      },
+    };
+  });
 }
 
 // ─── PDF Generator ────────────────────────────────────────────────────────────
-function generatePDF(meals, userInfo, macros, targetCalories, goalLabel) {
+function generatePDF(meals, userInfo, macros, targetCalories, actualCalories, goalLabel) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF('p', 'mm', 'a4');
   const W = 210, margin = 15, cW = W - margin * 2;
@@ -176,7 +231,7 @@ function generatePDF(meals, userInfo, macros, targetCalories, goalLabel) {
   doc.setFillColor(28, 28, 28); doc.roundedRect(margin, 178, cW, 52, 4, 4, 'F');
   doc.setFillColor(...gold); doc.roundedRect(margin, 178, cW, 6, 4, 4, 'F'); doc.rect(margin, 181, cW, 3, 'F');
   doc.setTextColor(...dark); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text('DAILY TARGETS', margin + 6, 185);
-  [['CALORIES', `${targetCalories}`, 'kcal'], ['PROTEIN', `${macros.protein}`, 'g'], ['CARBS', `${macros.carbs}`, 'g'], ['FAT', `${macros.fat}`, 'g']].forEach(([lbl, val, unit], i) => {
+  [['CALORIES', `${actualCalories}`, 'kcal'], ['PROTEIN', `${macros.protein}`, 'g'], ['CARBS', `${macros.carbs}`, 'g'], ['FAT', `${macros.fat}`, 'g']].forEach(([lbl, val, unit], i) => {
     const mx = margin + 6 + i * (cW / 4);
     doc.setTextColor(...gray); doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.text(lbl, mx, 198);
     doc.setTextColor(...gold); doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text(val, mx, 210);
@@ -190,7 +245,7 @@ function generatePDF(meals, userInfo, macros, targetCalories, goalLabel) {
   doc.setTextColor(...gold); doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text('YOUR MEAL PLAN', margin, y); y += 3;
   doc.setFillColor(...gold); doc.rect(margin, y, 38, 0.8, 'F'); y += 10;
   doc.setTextColor(...gray); doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-  doc.text(`Target: ${targetCalories} kcal  •  P:${macros.protein}g  •  C:${macros.carbs}g  •  F:${macros.fat}g`, margin, y); y += 10;
+  doc.text(`Target: ${targetCalories} kcal  •  Actual: ${actualCalories} kcal  •  P:${macros.protein}g  •  C:${macros.carbs}g  •  F:${macros.fat}g`, margin, y); y += 10;
 
   meals.forEach((meal, idx) => {
     checkBreak(meal.items.length * 8 + 30);
@@ -413,7 +468,7 @@ function StandardPlanView({ onSelectPlan }) {
 }
 
 // ─── Dynamic Plan View ────────────────────────────────────────────────────────
-function DynamicPlanView({ meals, userInfo, macros, targetCalories, tdee, onDownload, onEditSurvey }) {
+function DynamicPlanView({ meals, userInfo, macros, targetCalories, actualCalories, tdee, onDownload, onEditSurvey }) {
   const goalLabel = userInfo.goal === 'fat_loss' ? 'Fat Loss' : 'Muscle Gain';
   return (
     <div className="diet-dynamic-view">
@@ -422,7 +477,7 @@ function DynamicPlanView({ meals, userInfo, macros, targetCalories, tdee, onDown
           <span className="section-eyebrow">{goalLabel} — Personalized</span>
           <h2 className="section-title" style={{fontSize:'clamp(1.8rem,5vw,3rem)'}}>YOUR PLAN</h2>
           <p style={{color:'var(--text-secondary)', fontSize:'0.9rem', marginTop:'0.3rem'}}>
-            {userInfo.weight}kg · {userInfo.age}yrs · {userInfo.dietType === 'veg' ? '🥦 Veg' : '🍗 Non-Veg'} · TDEE: {tdee} kcal
+            {userInfo.weight}kg · {userInfo.age}yrs · {userInfo.dietType === 'veg' ? '🥦 Veg' : '🍗 Non-Veg'} · TDEE: {tdee} kcal · Target: {targetCalories} kcal
           </p>
         </div>
         <div style={{display:'flex', flexDirection:'column', gap:'0.6rem', alignItems:'flex-end'}}>
@@ -433,7 +488,7 @@ function DynamicPlanView({ meals, userInfo, macros, targetCalories, tdee, onDown
 
       <div className="diet-macro-bar">
         {[
-          {label:'Calories', value:targetCalories, unit:'kcal', color:'var(--accent)'},
+          {label:'Calories', value:actualCalories, unit:'kcal', color:'var(--accent)'},
           {label:'Protein', value:`${macros.protein}g`, unit:'', color:'#00bfff'},
           {label:'Carbs', value:`${macros.carbs}g`, unit:'', color:'#ffd700'},
           {label:'Fat', value:`${macros.fat}g`, unit:'', color:'#39ff14'},
@@ -548,9 +603,10 @@ export default function Diet() {
         protein: acc.protein + m.macros.protein,
         carbs: acc.carbs + m.macros.carbs,
         fat: acc.fat + m.macros.fat,
-      }), { protein: 0, carbs: 0, fat: 0 });
+        calories: acc.calories + m.macros.calories,
+      }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
       const macros = totals;
-      const planData = { meals: scaledMeals, userInfo: formData, macros, targetCalories, tdee };
+      const planData = { meals: scaledMeals, userInfo: formData, macros, targetCalories, actualCalories: totals.calories, tdee };
       setPlanResult(planData);
       // Save the survey answers + generated plan so the user isn't asked
       // to fill the form again next time they open this goal's tab.
@@ -566,7 +622,7 @@ export default function Diet() {
   function handleDownload() {
     if (!planResult) return;
     const goalLabel = planResult.userInfo.goal === 'fat_loss' ? 'Fat Loss' : 'Muscle Gain';
-    generatePDF(planResult.meals, planResult.userInfo, planResult.macros, planResult.targetCalories, goalLabel);
+    generatePDF(planResult.meals, planResult.userInfo, planResult.macros, planResult.targetCalories, planResult.actualCalories, goalLabel);
   }
 
   if (!user || !hasPlan(user, 'diet')) return null;
@@ -590,6 +646,7 @@ export default function Diet() {
             userInfo={planResult.userInfo}
             macros={planResult.macros}
             targetCalories={planResult.targetCalories}
+            actualCalories={planResult.actualCalories}
             tdee={planResult.tdee}
             onDownload={handleDownload}
             onEditSurvey={handleEditSurvey}
