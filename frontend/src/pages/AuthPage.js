@@ -5,61 +5,18 @@ import { useAuth } from '../context/AuthContext';
 import './AuthPage.css';
 
 import axios from 'axios';
-import { auth } from '../firebase';
-import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 
 export default function AuthPage() {
   const [mode, setMode] = useState('login');
-  const [authMethod, setAuthMethod] = useState('email'); // 'email' | 'phone'
-  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [confirmationResult, setConfirmationResult] = useState(null);
-  const { login, register, loginWithGoogle } = useAuth();
+  const { login, register, loginWithGoogle, setUser } = useAuth();
   const navigate = useNavigate();
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-
-  const setupRecaptcha = () => {
-    if (!window.recaptchaVerifier) {
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        size: 'invisible',
-      });
-    }
-  };
-
-  const handleSendOtp = async () => {
-    if (!form.phone || form.phone.length < 10) {
-      setError('Enter a valid 10-digit phone number'); return;
-    }
-    setLoading(true);
-    try {
-      setupRecaptcha();
-      const result = await signInWithPhoneNumber(auth, `+91${form.phone}`, window.recaptchaVerifier);
-      setConfirmationResult(result);
-      setOtpSent(true);
-      setError('');
-    } catch (err) {
-      // Log the real Firebase error code/message so the actual cause
-      // (e.g. auth/invalid-app-credential, auth/unauthorized-domain,
-      // billing-not-enabled, recaptcha domain mismatch) is visible in
-      // the browser console instead of being hidden behind a generic message.
-      console.error('Phone OTP error:', err.code, err.message);
-      if (window.recaptchaVerifier) {
-        try { window.recaptchaVerifier.clear(); } catch (e) {}
-      }
-      window.recaptchaVerifier = null;
-      setError(
-        err.code === 'auth/unauthorized-domain'
-          ? 'This domain is not authorized for phone sign-in. Add it under Firebase Console → Authentication → Settings → Authorized domains.'
-          : err.code === 'auth/invalid-app-credential' || err.code === 'auth/captcha-check-failed'
-            ? 'reCAPTCHA verification failed. Check your reCAPTCHA site key domain settings in Firebase/Google Cloud Console.'
-            : 'Failed to send OTP. Try again.'
-      );
-    } finally { setLoading(false); }
-  };
 
   const handleSendEmailOtp = async () => {
     if (!form.email) { setError('Enter your email'); return; }
@@ -80,23 +37,16 @@ export default function AuthPage() {
     setError('');
     setLoading(true);
     try {
-      if (authMethod === 'phone') {
-        if (!otpSent) { await handleSendOtp(); setLoading(false); return; }
-        const result = await confirmationResult.confirm(otp);
-        const idToken = await result.user.getIdToken();
-        const res = await axios.post(`${process.env.REACT_APP_API_URL}/auth/verify-phone-token`, {
-          idToken, name: form.name
-        });
-        login(res.data.token, res.data.user);
-        navigate('/');
-        return;
-      }
-      if (authMethod === 'email' && mode === 'register') {
+      if (mode === 'register') {
         if (!otpSent) { await handleSendEmailOtp(); setLoading(false); return; }
         const res = await axios.post(`${process.env.REACT_APP_API_URL}/auth/verify-email-otp`, {
           name: form.name, email: form.email, password: form.password, otp
         });
-        login(res.data.token, res.data.user);
+        // store token and user directly — don't call login() which would
+        // make a second /auth/login API call and fail
+        localStorage.setItem('fitppl_token', res.data.token);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
+        setUser(res.data.user);
         navigate('/');
         return;
       }
@@ -128,16 +78,10 @@ export default function AuthPage() {
           <button className={`auth-tab ${mode === 'register' ? 'active' : ''}`} onClick={() => { setMode('register'); setError(''); setOtpSent(false); }}>Create Account</button>
         </div>
 
-        <h1 className="auth-title">{mode === 'login' ? 'Welcome Back 💪' : 'Join The Iron Family 🔥'}</h1>
+        <h1 className="auth-title">{mode === 'login' ? 'Welcome Back 💪' : 'Join The Fit Army 🔥'}</h1>
         <p className="auth-subtitle">
           {mode === 'login' ? 'Sign in to access your workout plan, diet plan, and progress tracker.' : 'Create your free account and start building your best physique.'}
         </p>
-
-        {/* Auth Method Toggle */}
-        <div className="auth-method-toggle">
-          <button className={`method-btn ${authMethod === 'email' ? 'active' : ''}`} onClick={() => { setAuthMethod('email'); setOtpSent(false); setError(''); }}>📧 Email</button>
-          <button className={`method-btn ${authMethod === 'phone' ? 'active' : ''}`} onClick={() => { setAuthMethod('phone'); setOtpSent(false); setError(''); }}>📱 Phone</button>
-        </div>
 
         {error && <div className="auth-error">⚠️ {error}</div>}
 
@@ -149,41 +93,15 @@ export default function AuthPage() {
             </div>
           )}
 
-          {authMethod === 'email' ? (
-            <>
-              <div className="form-group">
-                <label>Email</label>
-                <input type="email" name="email" value={form.email} onChange={handleChange} placeholder="you@example.com" required />
-              </div>
-              <div className="form-group">
-                <label>Password</label>
-                <input type="password" name="password" value={form.password} onChange={handleChange} placeholder="••••••••" required minLength={6} />
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="form-group">
-                <label>Phone Number</label>
-                <div className="phone-input-wrap">
-                  <span className="phone-prefix">+91</span>
-                  <input type="tel" name="phone" value={form.phone} onChange={handleChange} placeholder="9876543210" maxLength={10} />
-                </div>
-              </div>
-              {otpSent && (
-                <div className="form-group">
-                  <label>Enter OTP</label>
-                  <input type="text" value={otp} onChange={e => setOtp(e.target.value)} placeholder="6-digit OTP" maxLength={6} />
-                  <p className="otp-hint">OTP sent to +91 {form.phone}</p>
-                </div>
-              )}
-              {!otpSent && (
-                <button type="button" className="btn-outline otp-btn" onClick={handleSendOtp} disabled={loading}>
-                  {loading ? '⏳ Sending...' : '📲 Send OTP'}
-                </button>
-              )}
-            </>
-          )}
-          {authMethod === 'email' && mode === 'register' && otpSent && (
+          <div className="form-group">
+            <label>Email</label>
+            <input type="email" name="email" value={form.email} onChange={handleChange} placeholder="you@example.com" required />
+          </div>
+          <div className="form-group">
+            <label>Password</label>
+            <input type="password" name="password" value={form.password} onChange={handleChange} placeholder="******" required minLength={6} />
+          </div>
+          {mode === 'register' && otpSent && (
             <div className="form-group">
               <label>Enter OTP sent to {form.email}</label>
               <input
@@ -203,7 +121,6 @@ export default function AuthPage() {
 
         <div className="auth-divider"><span>or continue with</span></div>
 
-        {/* Social Login Buttons */}
         <div className="social-buttons">
           <button className="social-btn google-btn" onClick={loginWithGoogle}>
             <svg width="18" height="18" viewBox="0 0 18 18">
@@ -215,7 +132,12 @@ export default function AuthPage() {
             Continue with Google
           </button>
 
-          <button className="social-btn facebook-btn" disabled title="Facebook login is temporarily unavailable" style={{opacity:0.45, cursor:'not-allowed', filter:'grayscale(1)'}}>
+          <button
+            className="social-btn facebook-btn"
+            disabled
+            title="Facebook login is temporarily unavailable"
+            style={{ opacity: 0.45, cursor: 'not-allowed', filter: 'grayscale(1)' }}
+          >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="#1877F2">
               <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
             </svg>
@@ -232,7 +154,6 @@ export default function AuthPage() {
         </p>
 
         <Link to="/" className="auth-back">← Back to Home</Link>
-        <div id="recaptcha-container"></div>
       </div>
     </div>
   );
