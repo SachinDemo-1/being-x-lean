@@ -43,8 +43,6 @@ function computeItemMacros(name, amount, isCountable) {
   return { protein: ref.p*factor, carbs: ref.c*factor, fat: ref.f*factor, calories: ref.cal*factor };
 }
 
-// ─── MEAL TEMPLATES (structure only; quantities scale from calculation) ──────
-// distribution % must sum to 100 per goal.
 const BASE_MEALS = {
   muscle_gain: [
     { id:'meal1', name:'Morning Shake', time:'7:00 AM', icon:'🥤', pct:22,
@@ -114,8 +112,8 @@ const BASE_MEALS = {
   ],
 };
 
-// ─── CORE CALCULATION FUNCTION ───────────────────────────────────────────────
-// Single source of truth for daily targets. Top cards + meals derive from this.
+// ─── CORE CALCULATION ────────────────────────────────────────────────────────
+// Tuned so 169cm / 64kg / 25y male (moderate) → ~2700 kcal, ~120g protein for muscle gain.
 function calculateNutrition({ weight, height, age, gender, activity, goal }) {
   const w = parseFloat(weight), h = parseFloat(height), a = parseInt(age);
 
@@ -131,11 +129,11 @@ function calculateNutrition({ weight, height, age, gender, activity, goal }) {
   // 3. Daily calorie target based on goal
   let calories;
   if (goal === 'fat_loss') calories = tdee - 500;
-  else                     calories = tdee + 400; // muscle gain: +300-500 mid
+  else                     calories = tdee + 250; // muscle gain: lean surplus
 
-  // 4. Macros
-  const protein = Math.round(w * 2);          // g
-  const fat     = Math.round(w * 1);          // g
+  // 4. Macros — protein 1.8g/kg, fat 1g/kg, remainder carbs
+  const protein = Math.round(w * 1.8);
+  const fat     = Math.round(w * 1);
   const proteinCal = protein * 4;
   const fatCal     = fat * 9;
   const carbsCal   = calories - proteinCal - fatCal;
@@ -151,8 +149,14 @@ function calculateNutrition({ weight, height, age, gender, activity, goal }) {
   };
 }
 
+// ─── ROUNDING HELPER ─────────────────────────────────────────────────────────
+// Grams/ml: <100 → nearest 5, ≥100 → nearest 50 (222→200, 236→250, 268→250, 275→300).
+function roundQuantity(value) {
+  if (value < 100) return Math.max(5, Math.round(value / 5) * 5);
+  return Math.max(50, Math.round(value / 50) * 50);
+}
+
 // ─── BUILD MEALS FROM TARGETS ────────────────────────────────────────────────
-// Scale each meal's ingredients so meal totals match target × pct%.
 function buildMeals(targets, goal, isVeg) {
   const template = BASE_MEALS[goal] || BASE_MEALS.muscle_gain;
 
@@ -160,7 +164,6 @@ function buildMeals(targets, goal, isVeg) {
     const share = meal.pct / 100;
     const mealTargetCal = targets.calories * share;
 
-    // Step 1: resolve veg/non-veg swap and compute base meal calories from ingredients
     const resolved = meal.items.map(item => {
       const useVeg = isVeg && item.vegAlt;
       return {
@@ -174,23 +177,19 @@ function buildMeals(targets, goal, isVeg) {
     const baseMealCal = resolved.reduce((sum, it) =>
       sum + computeItemMacros(it.name, it.base, it.countable).calories, 0);
 
-    // Step 2: scale ratio so meal calories ≈ target share
     const ratio = baseMealCal > 0 ? mealTargetCal / baseMealCal : 1;
 
-    // Step 3: scale each ingredient
     const items = resolved.map(it => {
       let amount;
       if (it.countable) {
         amount = Math.max(1, Math.round(it.base * ratio));
       } else {
-        // round to nearest 5g/ml for realistic quantities
-        amount = Math.max(5, Math.round((it.base * ratio) / 5) * 5);
+        amount = roundQuantity(it.base * ratio);
       }
       const macros = computeItemMacros(it.name, amount, it.countable);
       return { name: it.name, unit: it.unit, countable: it.countable, amount, macros };
     });
 
-    // Step 4: meal macros = sum of scaled ingredients (single source of truth)
     const mealMacros = items.reduce((acc, it) => ({
       protein: acc.protein + it.macros.protein,
       carbs:   acc.carbs   + it.macros.carbs,
@@ -220,11 +219,11 @@ function validatePlan(targets, meals) {
     calories:acc.calories+ m.macros.calories,
   }), { protein:0, carbs:0, fat:0, calories:0 });
 
-  const withinCal  = Math.abs(sum.calories - targets.calories) <= 100; // wider tolerance for rounding across 5 meals
-  const withinP    = Math.abs(sum.protein  - targets.protein)  <= 10;
-  const withinC    = Math.abs(sum.carbs    - targets.carbs)    <= 15;
-  const withinF    = Math.abs(sum.fat      - targets.fat)      <= 10;
-
+  // Wider tolerance because grams are rounded to 50.
+  const withinCal = Math.abs(sum.calories - targets.calories) <= 200;
+  const withinP   = Math.abs(sum.protein  - targets.protein)  <= 15;
+  const withinC   = Math.abs(sum.carbs    - targets.carbs)    <= 25;
+  const withinF   = Math.abs(sum.fat      - targets.fat)      <= 15;
   return { sum, ok: withinCal && withinP && withinC && withinF };
 }
 
@@ -235,7 +234,6 @@ function generatePDF(meals, userInfo, targets, goalLabel) {
   const W=210, margin=15, cW=W-margin*2;
   const gold=[212,175,55], dark=[15,15,15], white=[255,255,255], gray=[160,160,160];
   let y=0;
-
   function newPage(){ doc.addPage(); y=20;
     doc.setFillColor(...dark); doc.rect(0,0,W,12,'F');
     doc.setFillColor(...gold); doc.rect(0,12,W,1.5,'F');
@@ -247,7 +245,6 @@ function generatePDF(meals, userInfo, targets, goalLabel) {
   }
   function checkBreak(n=20){ if(y+n>270) newPage(); }
 
-  // Cover
   doc.setFillColor(...dark); doc.rect(0,0,W,297,'F');
   doc.setFillColor(...gold); doc.rect(0,0,W,3,'F'); doc.rect(margin,45,1.5,55,'F');
   doc.setTextColor(...gold); doc.setFont('helvetica','bold'); doc.setFontSize(11);
@@ -298,7 +295,6 @@ function generatePDF(meals, userInfo, targets, goalLabel) {
     doc.text(`${idx+1}. ${meal.name}`,margin+7,y+6.5);
     doc.setTextColor(...gray); doc.setFont('helvetica','normal'); doc.setFontSize(8);
     doc.text(meal.time,W-margin-2,y+6.5,{align:'right'}); y+=14;
-
     meal.items.forEach(item=>{
       checkBreak(8);
       doc.setFillColor(240,240,240); doc.rect(margin+4,y,cW-4,7,'F');
@@ -307,7 +303,6 @@ function generatePDF(meals, userInfo, targets, goalLabel) {
       doc.setFont('helvetica','bold'); doc.setTextColor(80,80,80);
       doc.text(`${item.amount} ${item.unit}`,W-margin-4,y+5,{align:'right'}); y+=8.5;
     });
-
     checkBreak(14);
     doc.setFillColor(245,245,245); doc.roundedRect(margin+4,y,cW-4,10,1,1,'F');
     [['P',`${meal.macros.protein}g`],['C',`${meal.macros.carbs}g`],['F',`${meal.macros.fat}g`],['~',`${meal.macros.calories}kcal`]].forEach(([lbl,val],i)=>{
@@ -316,7 +311,6 @@ function generatePDF(meals, userInfo, targets, goalLabel) {
       doc.setTextColor(50,50,50); doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.text(val,mx2,y+8.5,{align:'center'});
     }); y+=16;
   });
-
   doc.save(`BeingXLean_${goalLabel.replace(/\s/g,'_')}_Plan.pdf`);
 }
 
@@ -419,8 +413,8 @@ function StandardPlanView({ onSelectPlan }) {
       </div>
       <div className="diet-standard-cards">
         {[
-          {icon:'💪',title:'Muscle Gain',goal:'muscle_gain',cal:'TDEE + 300–500',protein:'2g / kg',color:'#ff4500',desc:'Calorie surplus + high protein to build lean mass fast.'},
-          {icon:'🔥',title:'Fat Loss',goal:'fat_loss',cal:'TDEE − 500',protein:'2g / kg',color:'#39ff14',desc:'Moderate deficit while preserving muscle with high protein.'},
+          {icon:'💪',title:'Muscle Gain',goal:'muscle_gain',cal:'TDEE + 250',protein:'1.8g / kg',color:'#ff4500',desc:'Lean surplus + high protein to build quality muscle.'},
+          {icon:'🔥',title:'Fat Loss',goal:'fat_loss',cal:'TDEE − 500',protein:'1.8g / kg',color:'#39ff14',desc:'Moderate deficit while preserving muscle with high protein.'},
           {icon:'⚖️',title:'Body Recomposition',cal:'TDEE + 200–300',protein:'1.8–2.0g/kg',color:'#ffd700',desc:'Slow quality gains with whole foods. 0.25–0.5kg/week.',locked:true},
         ].map(p=>(
           <div key={p.title} className="diet-std-card"
@@ -482,8 +476,6 @@ function DynamicPlanView({ meals, userInfo, targets, validation, onDownload, onE
           <button className="btn-outline" onClick={()=>onEditSurvey(userInfo.goal)} style={{whiteSpace:'nowrap'}}>✏️ Edit Details</button>
         </div>
       </div>
-
-      {/* TOP CARDS — driven directly by calculateNutrition() */}
       <div className="diet-macro-bar">
         {[
           {label:'Calories',value:targets.calories,color:'var(--accent)'},
@@ -497,12 +489,9 @@ function DynamicPlanView({ meals, userInfo, targets, validation, onDownload, onE
           </div>
         ))}
       </div>
-
-      {/* validation strip */}
       <div style={{textAlign:'center',fontSize:'0.78rem',margin:'0.4rem 0 1rem',color: validation.ok?'#39ff14':'#ff8a00'}}>
         {validation.ok ? '✓ Meals match daily target' : '⚠ Small variance vs target'} — Sum: {validation.sum.calories}kcal · P {validation.sum.protein}g · C {validation.sum.carbs}g · F {validation.sum.fat}g
       </div>
-
       <div className="diet-meals-list">
         {meals.map((meal,idx)=>(
           <div key={meal.id} className="diet-meal-block diet-reveal">
@@ -530,7 +519,6 @@ function DynamicPlanView({ meals, userInfo, targets, validation, onDownload, onE
           </div>
         ))}
       </div>
-
       <div style={{display:'flex',justifyContent:'center',marginTop:'2rem'}}>
         <button className="btn-primary" onClick={onDownload}>⬇ Download PDF</button>
       </div>
@@ -580,13 +568,9 @@ export default function Diet() {
   function handleSurveySubmit(formData){
     setLoading(true);
     setTimeout(()=>{
-      // 1. Calculate daily targets from user inputs (SINGLE SOURCE OF TRUTH)
       const targets = calculateNutrition(formData);
-      // 2. Build meals scaled to those targets
       const meals = buildMeals(targets, formData.goal, formData.dietType==='veg');
-      // 3. Validate meal sums match targets within tolerance
       const validation = validatePlan(targets, meals);
-
       setPlanResult({ meals, userInfo: formData, targets, validation });
       try{ localStorage.setItem(`bxl_diet_survey_${formData.goal}`,JSON.stringify(formData)); }catch{}
       setActiveTab(formData.goal);
@@ -637,7 +621,6 @@ export default function Diet() {
           </div>
         )}
       </div>
-
       <nav className="diet-bottom-nav">
         {tabs.map(tab=>(
           <button key={tab.id} className={`diet-nav-tab ${activeTab===tab.id?'active':''}`} onClick={()=>handleTabClick(tab.id)}>
@@ -647,7 +630,6 @@ export default function Diet() {
           </button>
         ))}
       </nav>
-
       {showSurvey && (
         <SurveyModal
           planType={surveyPlanType}
