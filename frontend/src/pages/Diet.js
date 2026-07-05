@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { hasPlan } from '../context/purchases';
 import './Diet.css';
+import bodyImage from "../assets/body.png";
 
 // ─── NUTRITION DB (per 100g/ml, or per single unit for countables) ────────────
 const NUTRITION = {
@@ -228,7 +229,7 @@ function validatePlan(targets, meals) {
 }
 
 // ─── PDF Generator ───────────────────────────────────────────────────────────
-function generatePDF(meals, userInfo, targets, goalLabel) {
+function generatePDF(meals, userInfo, targets, goalLabel, bodyImage) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF('p','mm','a4');
   const W=210, margin=15, cW=W-margin*2;
@@ -256,6 +257,17 @@ function generatePDF(meals, userInfo, targets, goalLabel) {
   doc.setFontSize(16); doc.setTextColor(...gold); doc.text('DIET PLAN',margin+6,78);
   doc.setTextColor(...gray); doc.setFont('helvetica','normal'); doc.setFontSize(9);
   doc.text('Personalized for your body & goals',margin+6,90);
+  const img = new Image();
+  img.src = bodyImage;
+
+  doc.addImage(
+    img,
+    "PNG",
+    105,  // X position
+    35,   // Y position
+    75,   // width
+    70    // height
+  );
 
   doc.setFillColor(28,28,28); doc.roundedRect(margin,105,cW,62,4,4,'F');
   doc.setFillColor(...gold); doc.roundedRect(margin, 105, cW, 9, 4, 4, 'F'); doc.rect(margin, 108, cW, 6, 'F');
@@ -582,7 +594,7 @@ export default function Diet() {
   function handleDownload(){
     if(!planResult) return;
     const goalLabel = planResult.userInfo.goal==='fat_loss' ? 'Fat Loss' : 'Muscle Gain';
-    generatePDF(planResult.meals, planResult.userInfo, planResult.targets, goalLabel);
+    generatePDF(planResult.meals, planResult.userInfo, planResult.targets, goalLabel , bodyImage);
   }
 
   if(!user || !hasPlan(user,'diet')) return null;
