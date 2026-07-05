@@ -51,7 +51,7 @@ const PLANS = [
     title: 'BUY',
     subtitle: 'DIET PLAN',
     originalPrice: 500,
-    price: 5, // ← change me
+    price: 199, // ← change me
     color: '#39ff14',
     features: ['Personalized Diet Plan', 'Meal Plan (Veg/Non-Veg)', 'Calorie & Macronutrient Guide', 'Healthy & Effective Nutrition'],
     razorpayLink: 'https://rzp.io/l/diet-plan',
