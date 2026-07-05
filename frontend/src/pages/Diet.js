@@ -265,7 +265,7 @@ function generatePDF(meals, userInfo, targets, goalLabel, bodyImage) {
     "PNG",
     105,  // X position
     35,   // Y position
-    80,   // width
+    85,   // width
     70    // height
   );
 
