@@ -17,7 +17,7 @@ const NUTRITION = {
   'Sabzi (light)':              { per100: { p: 2,   c: 6,   f: 2,   cal: 55  } },
   'Chicken':                    { per100: { p: 31,  c: 0,   f: 3.6, cal: 165 } },
   'Grilled Chicken':            { per100: { p: 31,  c: 0,   f: 3.6, cal: 165 } },
-  'Paneer':                     { per100: { p: 18,  c: 1.2, f: 20,  cal: 265 } },
+  'Paneer/Tofu':                     { per100: { p: 18,  c: 1.2, f: 20,  cal: 265 } },
   'Soya Chunks':                { per100: { p: 52,  c: 33,  f: 0.5, cal: 345 } },
   'Curd':                       { per100: { p: 3.5, c: 4,   f: 4,   cal: 60  } },
   'Dal / Rajma / Chana':        { per100: { p: 7,   c: 20,  f: 1,   cal: 120 } },
