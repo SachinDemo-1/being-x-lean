@@ -4,9 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { hasPlan } from '../context/purchases';
 import './Diet.css';
 
-const BASE_CALORIES = 2700;
-
-// ─── Base meal plans (60kg / 2700kcal reference) ─────────────────────────────
+// ─── Base meal plans (reference ingredient amounts before per-user scaling) ──
 const BASE_MEALS = {
   muscle_gain: [
     { id: 'meal1', name: 'Morning Shake', time: '7:00 AM', icon: '🥤',
