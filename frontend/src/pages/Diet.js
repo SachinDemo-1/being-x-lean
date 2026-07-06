@@ -58,7 +58,7 @@ const BASE_MEALS = {
       items:[
         { name:'Rice / Roti', base:250, unit:'g' },
         { name:'Sabzi (1 Bowl)', base:175, unit:'g' },
-        { name:'Chicken', base:100, unit:'g', vegAlt:'Paneer', vegBase:100, vegUnit:'g' },
+        { name:'Chicken', base:100, unit:'g', vegAlt:'Paneer/Tofu', vegBase:100, vegUnit:'g' },
       ]},
     { id:'meal3', name:'Evening Snack', time:'4:30 PM', icon:'🥚', pct:13,
       items:[
