@@ -213,7 +213,7 @@ function SixDayLevelCards({ onSelect }) {
           <div className="level-card-badge">Push-Pull-Leg</div>
           <div className="level-card-icon">💀</div>
           <h3>Ultimate Workout Plan</h3>
-          <p>High frequency, Normal volume PPL for lifters who have built a strong base. Just for beginners And Intermidiates.</p>
+          <p>High frequency, Normal volume PPL for lifters who have built a strong base. Just for beginners.</p>
           <ul className="level-features">
             <li>✅ 7–8 exercises per day</li>
             <li>✅ 9–12 rep range with light work</li>
@@ -222,7 +222,7 @@ function SixDayLevelCards({ onSelect }) {
             <li>✅ Basic techniques</li>
           </ul>
           <div className="level-note">⚠️ Warning! This Trainnig Will Make You Beast 💪</div>
-          <button className="btn-outline" style={{ marginTop: '1rem', width: '100%' }} onClick={() => onSelect('advanced')}>See Plan</button>
+          <button className="btn-outline" style={{ marginTop: '1rem', width: '100%' }} onClick={() => onSelect('advanced')}>Start Workout Plan</button>
         </div>
       </div>
     </div>
@@ -294,13 +294,14 @@ export default function Workout() {
   const workoutRef = useRef(null);
   const dayTabsRef = useRef(null);
   const contentAnchorRef = useRef(null);
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) { navigate('/auth', { replace: true }); return; }
     if (!hasPlan(user, 'workout')) { navigate('/pricing?for=workout', { replace: true }); return; }
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
   const plan = workoutPlans[selectedDays];
   
@@ -359,6 +360,7 @@ export default function Workout() {
     link.click();
   };
 
+  if (authLoading) return null;
   if (!user || !hasPlan(user, 'workout')) return null;
 
   return (

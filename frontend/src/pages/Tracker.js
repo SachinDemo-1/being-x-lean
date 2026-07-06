@@ -26,7 +26,7 @@ function saveData(data) {
 }
 
 export default function Tracker() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const today = getTodayKey();
 
@@ -40,8 +40,9 @@ export default function Tracker() {
   const [toast, setToast] = useState('');
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) { navigate('/auth', { replace: true }); return; }
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
   useEffect(() => {
     const todayData = data[today] || {};
@@ -104,6 +105,7 @@ export default function Tracker() {
   const weeklyCalories = history.reduce((acc, h) => acc + (parseInt(h.data?.nutrition?.calories) || 0), 0);
   const weeklyProtein = history.reduce((acc, h) => acc + (parseInt(h.data?.nutrition?.protein) || 0), 0);
 
+  if (authLoading) return null;
   if (!user) return null;
 
   return (
