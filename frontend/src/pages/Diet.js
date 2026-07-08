@@ -7,48 +7,47 @@ import './Diet.css';
 // ─── Base meal plans (reference ingredient amounts before per-user scaling) ──
 const BASE_MEALS = {
   muscle_gain: [
-    { id: 'meal1', name: 'Morning Shake', time: '7:00 AM', icon: '🥤',
+    { id: 'meal1', name: 'Pre-Workout', time: '7:00 AM', icon: '🌅',
       items: [
         { name: 'Oats', base: 70, unit: 'g' },
         { name: 'Milk', base: 250, unit: 'ml' },
         { name: 'Banana', base: 1, unit: 'pc', countable: true },
-        { name: 'Peanut Butter', base: 1, unit: 'spoon', countable: true },
-        { name: 'Almonds (Badam) [15-20 pc]', base: 18, unit: 'g' },
+        { name: 'Almonds (Badam) [15 pc]', base: 15, unit: 'g' },
       ],
-      macros: { protein: 18, carbs: 75, fat: 22, calories: 600 }
+      macros: { protein: 16, carbs: 70, fat: 18, calories: 520 }
     },
-    { id: 'meal2', name: 'Lunch', time: '1:00 PM', icon: '🍛',
+    { id: 'meal2', name: 'Post-Workout', time: '10:00 AM', icon: '💪',
+      items: [
+        { name: 'Whey Protein', base: 1, unit: 'scoop', countable: true },
+        { name: 'Brown Bread', base: 60, unit: 'g' },
+        { name: 'Peanut Butter', base: 1, unit: 'spoon', countable: true },
+        { name: 'Boiled Potato', base: 2, unit: 'pc', countable: true },
+      ],
+      macros: { protein: 30, carbs: 55, fat: 12, calories: 460 }
+    },
+    { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
       items: [
         { name: 'Rice / Roti', base: 250, unit: 'g' },
-        { name: 'Sabzi (1 Bowl)', base: 175, unit: 'g' },
-        { name: 'Chicken', base: 100, unit: 'g', vegAlt: 'Paneer / Tofu', vegBase: 100, vegUnit: 'g' },
+        { name: 'Dal / Rajma', base: 200, unit: 'g' },
+        { name: 'Salad', base: 100, unit: 'g' },
       ],
-      macros: { protein: 29, carbs: 65, fat: 10, calories: 550 }
+      macros: { protein: 20, carbs: 90, fat: 6, calories: 500 }
     },
-    { id: 'meal3', name: 'Evening Snack', time: '4:30 PM', icon: '🥚',
+    { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜',
       items: [
         { name: 'Soya Chunks', base: 30, unit: 'g' },
         { name: 'Curd', base: 200, unit: 'g' },
       ],
-      macros: { protein: 23, carbs: 15, fat: 18, calories: 350 }
-    },
-    { id: 'meal4', name: 'Pre/Post Workout Shake', time: '7:00 PM', icon: '💪',
-      items: [
-        { name: 'Oats', base: 60, unit: 'g' },
-        { name: 'Milk', base: 250, unit: 'ml' },
-        { name: 'Banana', base: 1, unit: 'pc', countable: true },
-        { name: 'Peanut Butter', base: 1, unit: 'spoon', countable: true },
-        { name: 'Whey Protein', base: 1, unit: 'scoop', countable: true },
-      ],
-      macros: { protein: 32, carbs: 65, fat: 14, calories: 600 }
+      macros: { protein: 23, carbs: 15, fat: 6, calories: 250 }
     },
     { id: 'meal5', name: 'Dinner', time: '9:00 PM', icon: '🍲',
       items: [
         { name: 'Rice / Roti', base: 200, unit: 'g' },
-        { name: 'Dal / Rajma / Chana', base: 225, unit: 'g' },
-        { name: 'Curd', base: 200, unit: 'g' },
+        { name: 'Dal / Rajma', base: 150, unit: 'g' },
+        { name: 'Mix Veg', base: 100, unit: 'g' },
+        { name: 'Paneer / Tofu', base: 100, unit: 'g' },
       ],
-      macros: { protein: 17, carbs: 62, fat: 7, calories: 440 }
+      macros: { protein: 24, carbs: 60, fat: 15, calories: 470 }
     },
   ],
   fat_loss: [
@@ -73,32 +72,48 @@ const BASE_MEALS = {
         { name: 'Rice / Roti', base: 200, unit: 'g' },
         { name: 'Dal / Rajma', base: 150, unit: 'g' },
         { name: 'Sabzi (1 Bowl)', base: 100, unit: 'g' },
+        { name: 'Soya Chunks', base: 30, unit: 'g' },
         { name: 'Salad', base: 100, unit: 'g' },
       ],
-      macros: { protein: 16, carbs: 65, fat: 6, calories: 380 }
+      macros: { protein: 26, carbs: 70, fat: 6, calories: 440 }
     },
     { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜',
       items: [
-        { name: 'Roasted Chana / Soya Chunks / Sprouts Moong Dal', base: 40, unit: 'g' },
+        { name: 'Roasted Chana / Sprouts Moong Dal', base: 40, unit: 'g' },
         { name: 'Curd', base: 150, unit: 'g' },
       ],
-      macros: { protein: 14, carbs: 20, fat: 3, calories: 170 }
+      macros: { protein: 12, carbs: 18, fat: 2, calories: 155 }
     },
     { id: 'meal5', name: 'Dinner', time: '8:00 PM', icon: '🥣',
       items: [
         { name: 'Paneer / Tofu', base: 100, unit: 'g' },
-        { name: 'Rice / Roti', base: 150, unit: 'g' },
+        { name: 'Fried Rice / Roti', base: 150, unit: 'g' },
         { name: 'Mix Veg', base: 100, unit: 'g' },
         { name: 'Salad', base: 100, unit: 'g' },
       ],
-      macros: { protein: 18, carbs: 45, fat: 12, calories: 370 }
+      macros: { protein: 18, carbs: 45, fat: 15, calories: 390 }
+    },
+  ],
+};
+
+// ─── Optional bonus meal — shown at the end, NOT counted toward the day's
+// calorie/protein/carb/fat target totals (purely an "if you need more" add-on)
+const OPTIONAL_MEALS = {
+  muscle_gain: [
+    { id: 'optional1', name: 'Optional (If You Need More Calories)', time: 'Anytime', icon: '➕',
+      items: [
+        { name: 'Banana', base: 1, unit: 'pc', countable: true },
+        { name: 'Oats', base: 40, unit: 'g' },
+        { name: 'Milk', base: 200, unit: 'ml' },
+        { name: 'Mixed Seeds', base: 15, unit: 'g' },
+      ],
     },
   ],
 };
 
 // ─── How much of the day's total macros each meal gets (must sum to 1.0) ─────
 const MEAL_SPLIT = {
-  muscle_gain: { meal1: 0.25, meal2: 0.30, meal3: 0.15, meal4: 0.15, meal5: 0.15 },
+  muscle_gain: { meal1: 0.20, meal2: 0.20, meal3: 0.25, meal4: 0.15, meal5: 0.20 },
   fat_loss:    { meal1: 0.15, meal2: 0.15, meal3: 0.30, meal4: 0.10, meal5: 0.30 },
 };
 
@@ -114,8 +129,10 @@ const NUTRITION = {
   'Oats':                              { per100: { p: 16,  c: 66, f: 7,   cal: 389 } },
   'Milk':                              { per100: { p: 3.2, c: 4.8, f: 3,  cal: 60  } },
   'Milk (low fat)':                    { per100: { p: 3.4, c: 5,  f: 1.5, cal: 47  } },
-  'Almonds (Badam) [15-20 pc]':        { per100: { p: 21,  c: 22, f: 50,  cal: 579 } },
+  'Almonds (Badam) [15 pc]':           { per100: { p: 21,  c: 22, f: 50,  cal: 579 } },
   'Rice / Roti':                       { per100: { p: 3,   c: 22, f: 2,   cal: 115 } },
+  'Fried Rice / Roti':                 { per100: { p: 3.5, c: 24, f: 6,   cal: 160 } },
+  'Brown Bread':                       { per100: { p: 9,   c: 43, f: 3,   cal: 250 } },
   'Brown Rice':                        { per100: { p: 2.6, c: 23, f: 0.9, cal: 111 } },
   'Sabzi (1 Bowl)':                    { per100: { p: 2,   c: 8,  f: 3,   cal: 70  } },
   'Sabzi (light)':                     { per100: { p: 2,   c: 6,  f: 2,   cal: 55  } },
@@ -128,7 +145,8 @@ const NUTRITION = {
   'Dal / Rajma':                       { per100: { p: 7,   c: 20, f: 1,   cal: 120 } },
   'Dal':                               { per100: { p: 7,   c: 20, f: 1,   cal: 120 } },
   'Upma / Poha':                       { per100: { p: 3,   c: 25, f: 4,   cal: 150 } },
-  'Roasted Chana / Soya Chunks / Sprouts Moong Dal': { per100: { p: 25, c: 35, f: 2, cal: 265 } },
+  'Roasted Chana / Sprouts Moong Dal': { per100: { p: 15, c: 45, f: 3, cal: 275 } },
+  'Mixed Seeds':                       { per100: { p: 20,  c: 20, f: 45,  cal: 550 } },
   'Mix Veg':                           { per100: { p: 2,   c: 8,  f: 3,   cal: 70  } },
   'Salad':                             { per100: { p: 1.5, c: 5,  f: 0.2, cal: 25  } },
   'Mixed Nuts':                        { per100: { p: 20,  c: 20, f: 50,  cal: 600 } },
@@ -138,6 +156,7 @@ const NUTRITION = {
   'Peanut Butter':                     { perUnit: { p: 4,   c: 3,  f: 8,   cal: 94  } },
   'Whey Protein':                      { perUnit: { p: 24,  c: 3,  f: 1.5, cal: 120 } },
   'Boiled Eggs':                       { perUnit: { p: 6,   c: 0.6, f: 5,  cal: 78  } },
+  'Boiled Potato':                     { perUnit: { p: 3,   c: 26, f: 0.15, cal: 130 } },
   'Green Tea':                         { perUnit: { p: 0,   c: 0,  f: 0,   cal: 2   } },
 };
 
@@ -265,8 +284,43 @@ function validateDietPlan(scaledMeals, targetMacros) {
   return { valid, sum, diffs };
 }
 
+// ─── Optional bonus meal(s) — resolved with real macros for the user's own
+// reference, but deliberately NEVER added into the day's target totals.
+// Quantities are fixed reference amounts (not scaled to the user's macros)
+// since this is an "extra, if you need it" add-on, not part of the plan.
+function resolveOptionalMeals(goal, isVeg) {
+  const meals = OPTIONAL_MEALS[goal] || [];
+  return meals.map(meal => {
+    const items = meal.items.map(item => {
+      const useVeg = isVeg && item.vegAlt;
+      const name = useVeg ? item.vegAlt : item.name;
+      const amount = useVeg ? item.vegBase : item.base;
+      const unit = useVeg ? (item.vegUnit || item.unit) : item.unit;
+      const countable = useVeg ? !!item.vegCountable : !!item.countable;
+      const macros = computeItemMacros(name, amount, countable);
+      return { ...item, name, unit, countable, amount, macros };
+    });
+    const macros = items.reduce((acc, it) => ({
+      protein: acc.protein + it.macros.protein,
+      carbs: acc.carbs + it.macros.carbs,
+      fat: acc.fat + it.macros.fat,
+      calories: acc.calories + it.macros.calories,
+    }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
+    return {
+      ...meal,
+      items,
+      macros: {
+        protein: Math.round(macros.protein),
+        carbs: Math.round(macros.carbs),
+        fat: Math.round(macros.fat),
+        calories: Math.round(macros.calories),
+      },
+    };
+  });
+}
+
 // ─── PDF Generator ────────────────────────────────────────────────────────────
-function generatePDF(meals, userInfo, macros, targetCalories, actualCalories, goalLabel) {
+function generatePDF(meals, optionalMeals, userInfo, macros, targetCalories, actualCalories, goalLabel) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF('p', 'mm', 'a4');
   const W = 210, margin = 15, cW = W - margin * 2;
@@ -360,6 +414,30 @@ function generatePDF(meals, userInfo, macros, targetCalories, actualCalories, go
       doc.setTextColor(50, 50, 50); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text(val, mx2, y + 8.5, { align: 'center' });
     }); y += 16;
   });
+
+  if (optionalMeals && optionalMeals.length > 0) {
+    checkBreak(20);
+    doc.setTextColor(...gray); doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5);
+    doc.text('Optional add-on below — NOT included in the Calories/Protein/Carbs/Fat totals above.', margin, y); y += 8;
+
+    optionalMeals.forEach(meal => {
+      checkBreak(meal.items.length * 8 + 20);
+      doc.setFillColor(60, 60, 60); doc.roundedRect(margin, y, cW, 10, 2, 2, 'F');
+      doc.setFillColor(...gold); doc.rect(margin, y, 3, 10, 'F');
+      doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+      doc.text(`${meal.name}`, margin + 7, y + 6.5); y += 14;
+
+      meal.items.forEach(item => {
+        checkBreak(8);
+        doc.setFillColor(240, 240, 240); doc.rect(margin + 4, y, cW - 4, 7, 'F');
+        doc.setFillColor(...gold); doc.circle(margin + 7.5, y + 3.5, 1, 'F');
+        doc.setTextColor(50, 50, 50); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text(item.name, margin + 11, y + 5);
+        doc.setFont('helvetica', 'bold'); doc.setTextColor(80, 80, 80);
+        doc.text(`${item.amount} ${item.unit}`, W - margin - 4, y + 5, { align: 'right' }); y += 8.5;
+      });
+      y += 6;
+    });
+  }
 
   doc.save(`BeingXLean_${goalLabel.replace(/\s/g, '_')}_Plan.pdf`);
 }
@@ -553,7 +631,7 @@ function StandardPlanView({ onSelectPlan }) {
 }
 
 // ─── Dynamic Plan View ────────────────────────────────────────────────────────
-function DynamicPlanView({ meals, userInfo, macros, targetCalories, actualCalories, tdee, onDownload, onEditSurvey }) {
+function DynamicPlanView({ meals, optionalMeals, userInfo, macros, targetCalories, actualCalories, tdee, onDownload, onEditSurvey }) {
   const goalLabel = userInfo.goal === 'fat_loss' ? 'Fat Loss' : 'Muscle Gain';
   return (
     <div className="diet-dynamic-view">
@@ -615,6 +693,34 @@ function DynamicPlanView({ meals, userInfo, macros, targetCalories, actualCalori
           </div>
         ))}
       </div>
+
+      {optionalMeals && optionalMeals.length > 0 && (
+        <div className="diet-meals-list" style={{marginTop:'1.5rem'}}>
+          <p style={{textAlign:'center', color:'var(--text-secondary)', fontSize:'0.8rem', marginBottom:'0.75rem'}}>
+            The section below is a bonus add-on — it is <strong>not included</strong> in your Calories/Protein/Carbs/Fat targets above.
+          </p>
+          {optionalMeals.map((meal) => (
+            <div key={meal.id} className="diet-meal-block diet-reveal" style={{borderStyle:'dashed', opacity:0.9}}>
+              <div className="diet-meal-block-header">
+                <span className="diet-meal-num">＋</span>
+                <div>
+                  <div className="diet-meal-block-name">{meal.name}</div>
+                  <div className="diet-meal-block-time">{meal.time}</div>
+                </div>
+                <span style={{fontSize:24, marginLeft:'auto'}}>{meal.icon}</span>
+              </div>
+              <div className="diet-meal-block-items">
+                {meal.items.map((item, i) => (
+                  <div key={i} className="diet-meal-row">
+                    <span>{item.name}</span>
+                    <span className="diet-meal-qty">{item.amount} {item.unit}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div style={{display:'flex', justifyContent:'center', marginTop:'2rem'}}>
         <button className="btn-primary" onClick={onDownload}>⬇ Download PDF</button>
@@ -703,8 +809,12 @@ export default function Diet() {
       // 6. Validate: sum of all meals should equal the target within tolerance.
       const { sum } = validateDietPlan(scaledMeals, targetMacros);
 
+      // Optional bonus meal(s) — shown separately, never counted in the totals above.
+      const optionalMeals = resolveOptionalMeals(goal, formData.dietType === 'veg');
+
       const planData = {
         meals: scaledMeals,
+        optionalMeals,
         userInfo: formData,
         macros: { protein: sum.protein, carbs: sum.carbs, fat: sum.fat },
         targetCalories,
@@ -726,7 +836,7 @@ export default function Diet() {
   function handleDownload() {
     if (!planResult) return;
     const goalLabel = planResult.userInfo.goal === 'fat_loss' ? 'Fat Loss' : 'Muscle Gain';
-    generatePDF(planResult.meals, planResult.userInfo, planResult.macros, planResult.targetCalories, planResult.actualCalories, goalLabel);
+    generatePDF(planResult.meals, planResult.optionalMeals, planResult.userInfo, planResult.macros, planResult.targetCalories, planResult.actualCalories, goalLabel);
   }
 
   if (authLoading) return null;
@@ -748,6 +858,7 @@ export default function Diet() {
         {activeTab !== 'standard' && planResult && (
           <DynamicPlanView
             meals={planResult.meals}
+            optionalMeals={planResult.optionalMeals}
             userInfo={planResult.userInfo}
             macros={planResult.macros}
             targetCalories={planResult.targetCalories}
