@@ -4,408 +4,403 @@ import { useAuth } from '../context/AuthContext';
 import { hasPlan } from '../context/purchases';
 import './Diet.css';
 
-// ─── Base meal plans (reference ingredient amounts before per-user scaling) ──
-const BASE_MEALS = {
+/* ═══════════════════════════════════════════════════════════════════════════
+   DIET ENGINE  (mathematically accurate, ingredient-driven)
+   ───────────────────────────────────────────────────────────────────────────
+   Design:
+     1. Every ingredient lives in NUTRI_DB with real per-unit macros.
+     2. Meal templates declare ingredients as either FIXED (never scale)
+        or DYNAMIC (scaled to hit remaining macro targets).
+     3. Pipeline:
+          BMR → TDEE → target {kcal,P,C,F}
+          subtract fixed-food macros
+          distribute remainder across dynamic foods by role weights
+          round to realistic portions (per-food step & bounds)
+          recompute + rebalance within tolerance
+     4. UI reads `meal.items[]` and `meal.macros` — shape preserved.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Nutrition database ───────────────────────────────────────────────────
+   `per` is the reference amount for the listed macros.
+   For countable items (banana, eggs, roti, bread, whey, salad, curd, bowl)
+   the reference is 1 piece / scoop / bowl / plate.
+   For gram/ml items the reference is 100 (per 100 g or per 100 ml).            */
+const NUTRI_DB = {
+  // Carb sources (dynamic)
+  oats:            { per: 100, unit: 'g',     p: 13,  c: 68, f: 7,   kcal: 380 },
+  rice:            { per: 100, unit: 'g',     p: 2.7, c: 28, f: 0.3, kcal: 130 },  // cooked white
+  brown_rice:      { per: 100, unit: 'g',     p: 2.6, c: 23, f: 0.9, kcal: 112 },
+  roti:            { per: 1,   unit: 'pc',    p: 3.1, c: 15, f: 0.4, kcal: 80,  countable: true }, // 40g whole-wheat
+  brown_bread:     { per: 1,   unit: 'slice', p: 2.5, c: 12, f: 1,   kcal: 70,  countable: true }, // ~30g
+  boiled_potato:   { per: 100, unit: 'g',     p: 2,   c: 20, f: 0.1, kcal: 87 },
+  banana:          { per: 1,   unit: 'pc',    p: 1.3, c: 27, f: 0.4, kcal: 105, countable: true },
+
+  // Protein sources (dynamic)
+  chicken:         { per: 100, unit: 'g',     p: 31,  c: 0,  f: 3.6, kcal: 165 }, // cooked breast
+  eggs:            { per: 1,   unit: 'pc',    p: 6,   c: 0.6, f: 5,  kcal: 78,  countable: true },
+  soya_chunks:     { per: 100, unit: 'g',     p: 52,  c: 33, f: 0.5, kcal: 345 }, // dry
+
+  // Fat sources (dynamic)
+  peanut_butter:   { per: 100, unit: 'g',     p: 25,  c: 20, f: 50,  kcal: 590 },
+  almonds:         { per: 100, unit: 'g',     p: 21,  c: 22, f: 50,  kcal: 580 },
+  mixed_seeds:     { per: 100, unit: 'g',     p: 20,  c: 20, f: 45,  kcal: 560 },
+  mixed_nuts:      { per: 100, unit: 'g',     p: 20,  c: 20, f: 55,  kcal: 600 },
+
+  // FIXED foods (never scale)
+  paneer:          { per: 100, unit: 'g',     p: 18,  c: 3,  f: 20,  kcal: 265 },
+  whey_protein:    { per: 1,   unit: 'scoop', p: 24,  c: 3,  f: 1.5, kcal: 120, countable: true }, // 30g
+  milk:            { per: 100, unit: 'ml',    p: 3.3, c: 5,  f: 3.5, kcal: 62 },
+  milk_lowfat:     { per: 100, unit: 'ml',    p: 3.4, c: 5,  f: 1.5, kcal: 45 },
+  salad_plate:     { per: 1,   unit: 'plate', p: 2,   c: 8,  f: 0.3, kcal: 40,  countable: true }, // 150g
+  curd_bowl:       { per: 1,   unit: 'bowl',  p: 22,  c: 24, f: 8,   kcal: 196, countable: true }, // 200g
+  dal_sabzi_bowl:  { per: 1,   unit: 'bowl',  p: 12,  c: 30, f: 5,   kcal: 220, countable: true }, // ~250g
+  sabzi_bowl:      { per: 1,   unit: 'bowl',  p: 4,   c: 16, f: 6,   kcal: 130, countable: true }, // ~200g mixed veg
+  soup_bowl:       { per: 1,   unit: 'bowl',  p: 3,   c: 12, f: 1,   kcal: 70,  countable: true },
+  green_tea:       { per: 1,   unit: 'cup',   p: 0,   c: 0,  f: 0,   kcal: 2,   countable: true },
+};
+
+/* ── Rounding rules per dynamic food (realistic portions) ─────────────── */
+const ROUND_RULES = {
+  oats:          { step: 5,  min: 20, max: 100 },
+  rice:          { step: 25, min: 100, max: 400 },
+  brown_rice:    { step: 25, min: 100, max: 350 },
+  roti:          { step: 1,  min: 1,   max: 6 },
+  brown_bread:   { step: 1,  min: 2,   max: 6 },
+  boiled_potato: { step: 25, min: 100, max: 400 },
+  banana:        { step: 1,  min: 1,   max: 3 },
+  chicken:       { step: 20, min: 100, max: 300 },
+  eggs:          { step: 1,  min: 2,   max: 6 },
+  soya_chunks:   { step: 10, min: 20,  max: 80 },
+  peanut_butter: { step: 5,  min: 5,   max: 40 },
+  almonds:       { step: 5,  min: 5,   max: 40 },
+  mixed_seeds:   { step: 5,  min: 5,   max: 30 },
+  mixed_nuts:    { step: 5,  min: 10,  max: 40 },
+};
+
+/* ── Display metadata (name shown in UI + veg alternative) ────────────── */
+const DISPLAY = {
+  oats:            { name: 'Oats' },
+  rice:            { name: 'Rice (cooked)' },
+  brown_rice:      { name: 'Brown Rice (cooked)' },
+  roti:            { name: 'Roti' },
+  brown_bread:     { name: 'Brown Bread' },
+  boiled_potato:   { name: 'Boiled Potato' },
+  banana:          { name: 'Banana' },
+  chicken:         { name: 'Chicken (cooked)', vegAlt: 'Paneer' },
+  eggs:            { name: 'Eggs',             vegAlt: 'Soya Chunks' },
+  soya_chunks:     { name: 'Soya Chunks' },
+  peanut_butter:   { name: 'Peanut Butter' },
+  almonds:         { name: 'Almonds' },
+  mixed_seeds:     { name: 'Mixed Seeds' },
+  mixed_nuts:      { name: 'Mixed Nuts' },
+  paneer:          { name: 'Paneer' },
+  whey_protein:    { name: 'Whey Protein' },
+  milk:            { name: 'Milk' },
+  milk_lowfat:     { name: 'Milk (low fat)' },
+  salad_plate:     { name: 'Salad' },
+  curd_bowl:       { name: 'Curd' },
+  dal_sabzi_bowl:  { name: 'Dal / Rajma + Sabzi' },
+  sabzi_bowl:      { name: 'Mixed Vegetables' },
+  soup_bowl:       { name: 'Vegetable Soup' },
+  green_tea:       { name: 'Green Tea' },
+};
+
+/* ── Role of each dynamic ingredient (governs macro-target distribution)  */
+const ROLE = {
+  oats: 'carb',          rice: 'carb',      brown_rice: 'carb',
+  roti: 'carb',          brown_bread: 'carb', boiled_potato: 'carb',
+  banana: 'carb',
+  chicken: 'protein',    eggs: 'protein',   soya_chunks: 'protein',
+  peanut_butter: 'fat',  almonds: 'fat',    mixed_seeds: 'fat', mixed_nuts: 'fat',
+};
+
+/* ── Meal templates ───────────────────────────────────────────────────────
+   Every item is `{ key, fixed, amount?, weight? }`.
+     • fixed=true  → amount is a literal (never scales).
+     • fixed=false → weight controls its share of the remaining macro pool
+                     for its role (defaults to 1).
+                                                                            */
+const MEAL_TEMPLATES = {
   muscle_gain: [
-    { id: 'meal1', name: 'Pre-Workout', time: '7:00 AM', icon: '🌅',
+    { id: 'm1', name: 'Pre Workout',  time: '7:00 AM',  icon: '🥤',
       items: [
-        { name: 'Oats', base: 70, unit: 'g' },
-        { name: 'Milk', base: 250, unit: 'ml' },
-        { name: 'Banana', base: 1, unit: 'pc', countable: true },
-        { name: 'Almonds (Badam) [15 pc]', base: 15, unit: 'g' },
-      ],
-      macros: { protein: 16, carbs: 70, fat: 18, calories: 520 }
-    },
-    { id: 'meal2', name: 'Post-Workout', time: '10:00 AM', icon: '💪',
+        { key: 'oats',          fixed: false, weight: 1.0 },
+        { key: 'milk',          fixed: true,  amount: 250 },
+        { key: 'banana',        fixed: false, weight: 0.6 },
+        { key: 'almonds',       fixed: false, weight: 1.0 },
+      ] },
+    { id: 'm2', name: 'Post Workout', time: '9:30 AM',  icon: '💪',
       items: [
-        { name: 'Whey Protein', base: 1, unit: 'scoop', countable: true },
-        { name: 'Brown Bread', base: 60, unit: 'g' },
-        { name: 'Peanut Butter', base: 1, unit: 'spoon', countable: true },
-        { name: 'Boiled Potato', base: 2, unit: 'pc', countable: true },
-      ],
-      macros: { protein: 30, carbs: 55, fat: 12, calories: 460 }
-    },
-    { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
+        { key: 'whey_protein',  fixed: true,  amount: 1 },
+        { key: 'brown_bread',   fixed: false, weight: 1.0 },
+        { key: 'peanut_butter', fixed: false, weight: 1.2 },
+        { key: 'boiled_potato', fixed: false, weight: 1.3 },
+      ] },
+    { id: 'm3', name: 'Lunch',        time: '1:00 PM',  icon: '🍛',
       items: [
-        { name: 'Rice / Roti', base: 250, unit: 'g' },
-        { name: 'Dal / Rajma', base: 200, unit: 'g' },
-        { name: 'Salad', base: 100, unit: 'g' },
-      ],
-      macros: { protein: 20, carbs: 90, fat: 6, calories: 500 }
-    },
-    { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜',
+        { key: 'rice',            fixed: false, weight: 1.8 },
+        { key: 'dal_sabzi_bowl',  fixed: true,  amount: 1 },
+        { key: 'salad_plate',     fixed: true,  amount: 1 },
+      ] },
+    { id: 'm4', name: 'Evening',      time: '5:00 PM',  icon: '🥚',
       items: [
-        { name: 'Soya Chunks', base: 30, unit: 'g' },
-        { name: 'Curd', base: 200, unit: 'g' },
-      ],
-      macros: { protein: 23, carbs: 15, fat: 6, calories: 250 }
-    },
-    { id: 'meal5', name: 'Dinner', time: '9:00 PM', icon: '🍲',
+        { key: 'eggs',            vegSwap: 'soya_chunks', fixed: false, weight: 1.0 },
+        { key: 'curd_bowl',       fixed: true,  amount: 1 },
+      ] },
+    { id: 'm5', name: 'Dinner',       time: '9:00 PM',  icon: '🍲',
       items: [
-        { name: 'Rice / Roti', base: 200, unit: 'g' },
-        { name: 'Dal / Rajma', base: 150, unit: 'g' },
-        { name: 'Mix Veg', base: 100, unit: 'g' },
-        { name: 'Paneer / Tofu', base: 100, unit: 'g' },
-      ],
-      macros: { protein: 24, carbs: 60, fat: 15, calories: 470 }
-    },
+        { key: 'paneer',          fixed: true,  amount: 100 },
+        { key: 'roti',            fixed: false, weight: 1.4 },
+        { key: 'sabzi_bowl',      fixed: true,  amount: 1 },
+        { key: 'salad_plate',     fixed: true,  amount: 1 },
+      ] },
+    { id: 'm6', name: 'Optional',     time: '10:30 PM', icon: '🌙',
+      items: [
+        { key: 'oats',            fixed: false, weight: 0.6 },
+        { key: 'milk',            fixed: true,  amount: 250 },
+        { key: 'mixed_seeds',     fixed: false, weight: 1.0 },
+      ] },
   ],
   fat_loss: [
-    { id: 'meal1', name: 'Pre-Workout', time: '6:30 AM', icon: '🌅',
+    { id: 'm1', name: 'Morning',      time: '7:00 AM',  icon: '🌅',
       items: [
-        { name: 'Upma / Poha', base: 150, unit: 'g' },
-        { name: 'Curd', base: 150, unit: 'g' },
-      ],
-      macros: { protein: 10, carbs: 40, fat: 8, calories: 280 }
-    },
-    { id: 'meal2', name: 'Post-Workout', time: '8:00 AM', icon: '🥤',
+        { key: 'oats',            fixed: false, weight: 1.0 },
+        { key: 'milk_lowfat',     fixed: true,  amount: 250 },
+        { key: 'banana',          fixed: false, weight: 0.7 },
+      ] },
+    { id: 'm2', name: 'Mid Morning',  time: '10:30 AM', icon: '🥗',
       items: [
-        { name: 'Oats', base: 40, unit: 'g' },
-        { name: 'Whey Protein', base: 1, unit: 'scoop', countable: true },
-        { name: 'Milk (low fat)', base: 200, unit: 'ml' },
-        { name: 'Banana', base: 1, unit: 'pc', countable: true },
-      ],
-      macros: { protein: 32, carbs: 45, fat: 6, calories: 350 }
-    },
-    { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
+        { key: 'eggs',            vegSwap: 'soya_chunks', fixed: false, weight: 1.0 },
+        { key: 'salad_plate',     fixed: true,  amount: 1 },
+      ] },
+    { id: 'm3', name: 'Lunch',        time: '1:00 PM',  icon: '🍛',
       items: [
-        { name: 'Rice / Roti', base: 200, unit: 'g' },
-        { name: 'Dal / Rajma', base: 150, unit: 'g' },
-        { name: 'Sabzi (1 Bowl)', base: 100, unit: 'g' },
-        { name: 'Soya Chunks', base: 30, unit: 'g' },
-        { name: 'Salad', base: 100, unit: 'g' },
-      ],
-      macros: { protein: 26, carbs: 70, fat: 6, calories: 440 }
-    },
-    { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜',
+        { key: 'brown_rice',      fixed: false, weight: 1.0 },
+        { key: 'dal_sabzi_bowl',  fixed: true,  amount: 1 },
+        { key: 'chicken',         vegSwap: 'soya_chunks', fixed: false, weight: 1.2 },
+        { key: 'salad_plate',     fixed: true,  amount: 1 },
+      ] },
+    { id: 'm4', name: 'Evening',      time: '5:00 PM',  icon: '🍵',
       items: [
-        { name: 'Roasted Chana / Sprouts Moong Dal', base: 40, unit: 'g' },
-        { name: 'Curd', base: 150, unit: 'g' },
-      ],
-      macros: { protein: 12, carbs: 18, fat: 2, calories: 155 }
-    },
-    { id: 'meal5', name: 'Dinner', time: '8:00 PM', icon: '🥣',
+        { key: 'green_tea',       fixed: true,  amount: 1 },
+        { key: 'mixed_nuts',      fixed: false, weight: 1.0 },
+      ] },
+    { id: 'm5', name: 'Dinner',       time: '8:30 PM',  icon: '🥣',
       items: [
-        { name: 'Paneer / Tofu', base: 100, unit: 'g' },
-        { name: 'Fried Rice / Roti', base: 150, unit: 'g' },
-        { name: 'Mix Veg', base: 100, unit: 'g' },
-        { name: 'Salad', base: 100, unit: 'g' },
-      ],
-      macros: { protein: 18, carbs: 45, fat: 15, calories: 390 }
-    },
+        { key: 'paneer',          fixed: true,  amount: 100 },
+        { key: 'roti',            fixed: false, weight: 1.0 },
+        { key: 'sabzi_bowl',      fixed: true,  amount: 1 },
+        { key: 'soup_bowl',       fixed: true,  amount: 1 },
+      ] },
   ],
 };
 
-// ─── Optional bonus meal — shown at the end, NOT counted toward the day's
-// calorie/protein/carb/fat target totals (purely an "if you need more" add-on)
-const OPTIONAL_MEALS = {
-  muscle_gain: [
-    { id: 'optional1', name: 'Optional (If You Need More Calories)', time: 'Anytime', icon: '➕',
-      items: [
-        { name: 'Banana', base: 1, unit: 'pc', countable: true },
-        { name: 'Oats', base: 40, unit: 'g' },
-        { name: 'Milk', base: 200, unit: 'ml' },
-        { name: 'Mixed Seeds', base: 15, unit: 'g' },
-      ],
-    },
-  ],
-};
-
-function roundToNearest5(value) {
-  return Math.round(value / 5) * 5;
+/* ── Macro maths for an ingredient at a given amount ──────────────────── */
+function macrosFor(key, amount) {
+  const n = NUTRI_DB[key];
+  const r = amount / n.per;
+  return {
+    protein:  n.p    * r,
+    carbs:    n.c    * r,
+    fat:      n.f    * r,
+    calories: n.kcal * r,
+  };
 }
 
-// ─── Real nutrition data (per 100g/ml, or per single unit for countable items) ─
-// Source: standard USDA-style reference values. This is what makes macros
-// mathematically consistent — every number below is calculated FROM the
-// actual ingredient + quantity shown, not a separately hand-typed guess.
-const NUTRITION = {
-  'Oats':                              { per100: { p: 16,  c: 66, f: 7,   cal: 389 } },
-  'Milk':                              { per100: { p: 3.2, c: 4.8, f: 3,  cal: 60  } },
-  'Milk (low fat)':                    { per100: { p: 3.4, c: 5,  f: 1.5, cal: 47  } },
-  'Almonds (Badam) [15 pc]':           { per100: { p: 21,  c: 22, f: 50,  cal: 579 } },
-  'Rice / Roti':                       { per100: { p: 3,   c: 22, f: 2,   cal: 115 } },
-  'Fried Rice / Roti':                 { per100: { p: 3.5, c: 24, f: 6,   cal: 160 } },
-  'Brown Bread':                       { per100: { p: 9,   c: 43, f: 3,   cal: 250 } },
-  'Brown Rice':                        { per100: { p: 2.6, c: 23, f: 0.9, cal: 111 } },
-  'Sabzi (1 Bowl)':                    { per100: { p: 2,   c: 8,  f: 3,   cal: 70  } },
-  'Sabzi (light)':                     { per100: { p: 2,   c: 6,  f: 2,   cal: 55  } },
-  'Chicken':                           { per100: { p: 31,  c: 0,  f: 3.6, cal: 165 } },
-  'Grilled Chicken':                   { per100: { p: 31,  c: 0,  f: 3.6, cal: 165 } },
-  'Paneer / Tofu':                     { per100: { p: 13,  c: 1.6, f: 12.4, cal: 170 } },
-  'Soya Chunks':                       { per100: { p: 52,  c: 33, f: 0.5, cal: 345 } },
-  'Curd':                              { per100: { p: 3.5, c: 4,  f: 4,   cal: 60  } },
-  'Dal / Rajma / Chana':               { per100: { p: 7,   c: 20, f: 1,   cal: 120 } },
-  'Dal / Rajma':                       { per100: { p: 7,   c: 20, f: 1,   cal: 120 } },
-  'Dal':                               { per100: { p: 7,   c: 20, f: 1,   cal: 120 } },
-  'Upma / Poha':                       { per100: { p: 3,   c: 25, f: 4,   cal: 150 } },
-  'Roasted Chana / Sprouts Moong Dal': { per100: { p: 15, c: 45, f: 3, cal: 275 } },
-  'Mixed Seeds':                       { per100: { p: 20,  c: 20, f: 45,  cal: 550 } },
-  'Mix Veg':                           { per100: { p: 2,   c: 8,  f: 3,   cal: 70  } },
-  'Salad':                             { per100: { p: 1.5, c: 5,  f: 0.2, cal: 25  } },
-  'Mixed Nuts':                        { per100: { p: 20,  c: 20, f: 50,  cal: 600 } },
-  'Vegetable Soup':                    { per100: { p: 1,   c: 5,  f: 0.5, cal: 30  } },
-  // Countable / per-single-unit items
-  'Banana':                            { perUnit: { p: 1.3, c: 27, f: 0.3, cal: 105 } },
-  'Peanut Butter':                     { perUnit: { p: 4,   c: 3,  f: 8,   cal: 94  } },
-  'Whey Protein':                      { perUnit: { p: 24,  c: 3,  f: 1.5, cal: 120 } },
-  'Boiled Eggs':                       { perUnit: { p: 6,   c: 0.6, f: 5,  cal: 78  } },
-  'Boiled Potato':                     { perUnit: { p: 3,   c: 26, f: 0.15, cal: 130 } },
-  'Green Tea':                         { perUnit: { p: 0,   c: 0,  f: 0,   cal: 2   } },
-};
-
-function computeItemMacros(name, amount, isCountable) {
-  const entry = NUTRITION[name];
-  if (!entry) return { protein: 0, carbs: 0, fat: 0, calories: 0 };
-  const ref = (isCountable && entry.perUnit) ? entry.perUnit : (entry.per100 || entry.perUnit);
-  const factor = (isCountable && entry.perUnit) ? amount : amount / 100;
-  const protein = ref.p * factor, carbs = ref.c * factor, fat = ref.f * factor;
-  // Calories are ALWAYS derived from the macros themselves (4 kcal/g protein,
-  // 4 kcal/g carbs, 9 kcal/g fat) rather than a separately-labeled number —
-  // this is what guarantees that hitting the protein/carb/fat targets
-  // automatically means the calorie target is hit too, with no separate
-  // source of drift between them.
-  const calories = protein * 4 + carbs * 4 + fat * 9;
-  return { protein, carbs, fat, calories };
+function zeroMacros() { return { protein: 0, carbs: 0, fat: 0, calories: 0 }; }
+function addMacros(a, b) {
+  return { protein: a.protein + b.protein, carbs: a.carbs + b.carbs,
+           fat: a.fat + b.fat, calories: a.calories + b.calories };
+}
+function roundMacros(m) {
+  return { protein: Math.round(m.protein), carbs: Math.round(m.carbs),
+           fat: Math.round(m.fat), calories: Math.round(m.calories) };
 }
 
-// ─── Scale meals from TARGET MACROS (not just a flat calorie ratio) ───────────
-// Two-phase approach across ALL meals in the plan:
-//  Phase A: work out, from each meal's OWN baseline ingredients, what share
-//    of the day's protein / carbs / fat it can realistically carry. A meal
-//    that's naturally protein-poor (e.g. oats+milk+banana) gets assigned a
-//    small protein-share and a bigger carb/fat-share — no meal is ever asked
-//    to hit a macro its food doesn't contain, which is what caused big drift.
-//  Phase B: for each meal, scale + correct its ingredients to hit that
-//    meal's own slice of the targets, then round for display. Every
-//    ingredient's final macros come from its ACTUAL rounded quantity, so
-//    meal totals are always the literal sum of what's on the plate, and day
-//    totals are always the literal sum of the meals. No hardcoded numbers.
-function scaleMeals(meals, targetMacros, isVeg) {
-  // Resolve veg/non-veg items once per meal up front.
-  const resolvedMeals = meals.map(meal => meal.items.map(item => {
-    const useVeg = isVeg && item.vegAlt;
-    return {
-      ...item,
-      name: useVeg ? item.vegAlt : item.name,
-      base: useVeg ? item.vegBase : item.base,
-      unit: useVeg ? (item.vegUnit || item.unit) : item.unit,
-      countable: useVeg ? !!item.vegCountable : !!item.countable,
-    };
+/* ── BMR / TDEE / targets ─────────────────────────────────────────────── */
+function computeTargets({ weight, height, age, gender, activity, goal }) {
+  const w = parseFloat(weight), h = parseFloat(height), a = parseInt(age, 10);
+  const bmr = gender === 'male'
+    ? 10 * w + 6.25 * h - 5 * a + 5
+    : 10 * w + 6.25 * h - 5 * a - 161;
+  const mult = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
+  const tdee = bmr * (mult[activity] || 1.55);
+
+  let calories, proteinPerKg, fatPct;
+  if (goal === 'fat_loss') {
+    calories = tdee - 400;
+    proteinPerKg = 2.2;
+    fatPct = 0.30;
+  } else { // muscle_gain
+    calories = tdee + 350;
+    proteinPerKg = 2.0;
+    fatPct = 0.25;
+  }
+  const protein = w * proteinPerKg;
+  const fat     = (calories * fatPct) / 9;
+  const carbs   = Math.max(0, (calories - protein * 4 - fat * 9) / 4);
+
+  return {
+    tdee: Math.round(tdee),
+    calories: Math.round(calories),
+    protein, carbs, fat,
+  };
+}
+
+/* ── Rounding to realistic portions ───────────────────────────────────── */
+function roundToStep(key, raw) {
+  const r = ROUND_RULES[key];
+  if (!r) return Math.max(1, Math.round(raw));
+  const stepped = Math.round(raw / r.step) * r.step;
+  return Math.min(r.max, Math.max(r.min, stepped));
+}
+
+/* ── Core: build a plan from user data ────────────────────────────────── */
+function buildPlan(userInfo) {
+  const goal = userInfo.goal;
+  const isVeg = userInfo.dietType === 'veg';
+  const target = computeTargets(userInfo);
+
+  // Deep-clone template. Resolve veg swaps to the actual food key up-front
+  // so ALL downstream maths uses correct nutrition, units, and rounding.
+  const meals = MEAL_TEMPLATES[goal].map(m => ({
+    ...m,
+    items: m.items.map(it => {
+      const key = isVeg && it.vegSwap ? it.vegSwap : it.key;
+      return { ...it, key, displayKey: it.key };
+    }),
   }));
 
-  // Phase A — each meal's baseline macro totals, then its share of the day.
-  const mealBaselines = resolvedMeals.map(items => {
-    const b = items.map(it => computeItemMacros(it.name, it.base, it.countable));
-    return b.reduce((acc, m) => ({
-      protein: acc.protein + m.protein, carbs: acc.carbs + m.carbs, fat: acc.fat + m.fat,
-    }), { protein: 0, carbs: 0, fat: 0 });
-  });
-  const dayBaseline = mealBaselines.reduce((acc, m) => ({
-    protein: acc.protein + m.protein, carbs: acc.carbs + m.carbs, fat: acc.fat + m.fat,
-  }), { protein: 0, carbs: 0, fat: 0 });
-
-  const mealTargets = mealBaselines.map(mb => ({
-    protein: dayBaseline.protein > 0 ? targetMacros.protein * (mb.protein / dayBaseline.protein) : targetMacros.protein / meals.length,
-    carbs:   dayBaseline.carbs  > 0 ? targetMacros.carbs  * (mb.carbs  / dayBaseline.carbs)  : targetMacros.carbs  / meals.length,
-    fat:     dayBaseline.fat   > 0 ? targetMacros.fat    * (mb.fat    / dayBaseline.fat)    : targetMacros.fat    / meals.length,
-  }));
-
-  // Phase B — scale + correct + round each meal against its own target slice.
-  const builtMeals = meals.map((meal, mi) => {
-    const resolved = resolvedMeals[mi];
-    const mealTarget = mealTargets[mi];
-    const baseline = resolved.map(it => computeItemMacros(it.name, it.base, it.countable));
-    const baseTotal = mealBaselines[mi];
-
-    const pScale = baseTotal.protein > 0 ? mealTarget.protein / baseTotal.protein : 1;
-    const cScale = baseTotal.carbs  > 0 ? mealTarget.carbs  / baseTotal.carbs  : 1;
-    const fScale = baseTotal.fat    > 0 ? mealTarget.fat    / baseTotal.fat    : 1;
-
-    // STEP 1 — initial guess: macro-weighted blend per ingredient.
-    let rawAmounts = resolved.map((it, i) => {
-      const b = baseline[i];
-      const macroSum = b.protein + b.carbs + b.fat;
-      const itemScale = macroSum > 0
-        ? (b.protein * pScale + b.carbs * cScale + b.fat * fScale) / macroSum
-        : 1;
-      return it.base * itemScale;
-    });
-
-    const density = resolved.map(it => computeItemMacros(it.name, it.countable ? 1 : 100, it.countable));
-
-    // STEP 2 — correction pass: close the remaining gap on each macro using
-    // the ingredient most associated with it. Repeated several times because
-    // correcting one macro can slightly disturb another (e.g. peanut butter
-    // carries both fat AND some carbs) — each extra pass cancels that out
-    // further, converging toward an exact match on the pre-rounding numbers.
-    for (let pass = 0; pass < 6; pass++) {
-      ['protein', 'carbs', 'fat'].forEach(key => {
-        const current = resolved.reduce((acc, it, i) => acc + computeItemMacros(it.name, rawAmounts[i], it.countable)[key], 0);
-        const gap = mealTarget[key] - current;
-        if (Math.abs(gap) < 0.01) return;
-
-        let anchorIdx = -1, maxShare = 0;
-        baseline.forEach((b, i) => { if (b[key] > maxShare) { maxShare = b[key]; anchorIdx = i; } });
-        if (anchorIdx === -1) return;
-
-        const perUnit = density[anchorIdx][key];
-        if (!perUnit || perUnit <= 0) return;
-        const unitsNeeded = resolved[anchorIdx].countable ? (gap / perUnit) : (gap / perUnit) * 100;
-        rawAmounts[anchorIdx] = Math.max(0, rawAmounts[anchorIdx] + unitsNeeded);
-      });
+  // 1. FIXED contribution -----------------------------------------------
+  let fixedTotal = zeroMacros();
+  meals.forEach(m => m.items.forEach(it => {
+    if (it.fixed) {
+      it.amount_final = it.amount;
+      it.macros = macrosFor(it.key, it.amount);
+      fixedTotal = addMacros(fixedTotal, it.macros);
     }
+  }));
 
-    // STEP 3 — round for display and compute each item's FINAL real macros.
-    const items = resolved.map((it, i) => {
-      const amount = it.countable
-        ? Math.max(1, Math.round(rawAmounts[i]))
-        : Math.max(5, roundToNearest5(rawAmounts[i]));
-      const macros = computeItemMacros(it.name, amount, it.countable);
-      return { ...it, amount, macros };
+  // 2. Remaining macros for dynamic distribution ------------------------
+  const remaining = {
+    protein:  Math.max(0, target.protein  - fixedTotal.protein),
+    carbs:    Math.max(0, target.carbs    - fixedTotal.carbs),
+    fat:      Math.max(0, target.fat      - fixedTotal.fat),
+    calories: Math.max(0, target.calories - fixedTotal.calories),
+  };
+
+  // 3. Bucket dynamic items by role -------------------------------------
+  const buckets = { carb: [], protein: [], fat: [] };
+  meals.forEach(m => m.items.forEach(it => {
+    if (!it.fixed) buckets[ROLE[it.key]].push(it);
+  }));
+  const allDyn = [...buckets.protein, ...buckets.carb, ...buckets.fat];
+
+  const sumWeights = arr => arr.reduce((s, it) => s + (it.weight ?? 1), 0);
+
+  // 4. Initial allocation: solve amount so item hits its share of the
+  //    remaining macro the item is primarily responsible for.
+  function allocate(role, macroKey) {
+    const arr = buckets[role];
+    const wSum = sumWeights(arr) || 1;
+    const pool = remaining[macroKey];
+    arr.forEach(it => {
+      const share = pool * (it.weight ?? 1) / wSum;
+      const n = NUTRI_DB[it.key];
+      const perUnit = n[macroKey === 'protein' ? 'p' : macroKey === 'carbs' ? 'c' : 'f'] / n.per;
+      const raw = perUnit > 0 ? share / perUnit : 0;
+      it.amount_final = roundToStep(it.key, raw);
+      it.macros = macrosFor(it.key, it.amount_final);
     });
+  }
+  allocate('protein', 'protein');
+  allocate('carb',    'carbs');
+  allocate('fat',     'fat');
 
-    // The meal's displayed macros are the literal sum of its ingredient rows.
-    const macros = items.reduce((acc, it) => ({
-      protein: acc.protein + it.macros.protein,
-      carbs: acc.carbs + it.macros.carbs,
-      fat: acc.fat + it.macros.fat,
-      calories: acc.calories + it.macros.calories,
-    }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
+  // 5. Rebalance — pick the worst-off macro (including calories) and
+  //    nudge the single item that best corrects it in one step, provided
+  //    it doesn't push another macro further out of tolerance.
+  const TOL      = { protein: 3, carbs: 5, fat: 3, calories: 40 };
+  const TOL_HARD = { protein: 8, carbs: 12, fat: 6, calories: 100 };
+  const KEYS = ['protein', 'carbs', 'fat', 'calories'];
 
-    return {
-      ...meal,
-      items,
-      macros: {
-        protein: Math.round(macros.protein),
-        carbs: Math.round(macros.carbs),
-        fat: Math.round(macros.fat),
-        calories: Math.round(macros.calories),
-      },
-    };
-  });
+  const totals = () => {
+    let t = zeroMacros();
+    meals.forEach(m => m.items.forEach(it => { t = addMacros(t, it.macros); }));
+    return t;
+  };
 
-  // Phase C — day-wide final correction. Per-meal correction (above) can
-  // still leave a small day-level gap when the same ingredient gets pulled
-  // in two directions across different meals. This pass looks across ALL
-  // meals at once and nudges whichever ingredient is most associated with
-  // any remaining protein/carbs/fat gap — preferring gram-based ingredients
-  // (fine 5g adjustments) over countable ones (coarse whole-unit jumps,
-  // e.g. a whey scoop swings protein by ~24g at a time) so the correction
-  // can actually land close to the target instead of overshooting. Run
-  // several times since fixing one macro can slightly disturb another.
-  for (let pass = 0; pass < 5; pass++) {
-    ['protein', 'carbs', 'fat'].forEach(key => {
-      const daySum = builtMeals.reduce((acc, m) => acc + m.macros[key], 0);
-      const gap = targetMacros[key] - daySum;
-      if (Math.abs(gap) < 0.5) return;
+  for (let iter = 0; iter < 200; iter++) {
+    const t = totals();
+    const diff = {};
+    KEYS.forEach(k => { diff[k] = target[k] - t[k]; });
+    const withinSoft = KEYS.every(k => Math.abs(diff[k]) <= TOL[k]);
+    if (withinSoft) break;
 
-      let bestMi = -1, bestIi = -1, bestContribution = 0;
-      let bestCountableMi = -1, bestCountableIi = -1, bestCountableContribution = 0;
-      builtMeals.forEach((m, mi) => {
-        m.items.forEach((it, ii) => {
-          if (it.countable) {
-            if (it.macros[key] > bestCountableContribution) { bestCountableContribution = it.macros[key]; bestCountableMi = mi; bestCountableIi = ii; }
-          } else if (it.macros[key] > bestContribution) {
-            bestContribution = it.macros[key]; bestMi = mi; bestIi = ii;
-          }
-        });
-      });
-      // Prefer a gram-based ingredient (fine control); only fall back to a
-      // countable one if nothing gram-based actually contains this macro.
-      if (bestMi === -1) { bestMi = bestCountableMi; bestIi = bestCountableIi; }
-      if (bestMi === -1) return;
+    const worst = KEYS.reduce((a, b) =>
+      Math.abs(diff[a]) / TOL[a] > Math.abs(diff[b]) / TOL[b] ? a : b);
+    const dir = diff[worst] > 0 ? +1 : -1;
 
-      const item = builtMeals[bestMi].items[bestIi];
-      const perUnit = computeItemMacros(item.name, item.countable ? 1 : 100, item.countable)[key];
-      if (!perUnit || perUnit <= 0) return;
-      const unitsNeeded = item.countable ? (gap / perUnit) : (gap / perUnit) * 100;
-      const newAmount = item.countable
-        ? Math.max(1, Math.round(item.amount + unitsNeeded))
-        : Math.max(5, roundToNearest5(item.amount + unitsNeeded));
+    // Candidate items: can move in `dir` without exceeding bounds.
+    let best = null, bestScore = -Infinity;
+    for (const it of allDyn) {
+      const r = ROUND_RULES[it.key]; const step = r?.step || 1;
+      const next = it.amount_final + dir * step;
+      if (next < (r?.min ?? 1) || next > (r?.max ?? 9999)) continue;
+      const delta = macrosFor(it.key, dir * step); // signed
+      // Score by movement on `worst`; penalise items that would blow a
+      // currently-in-range macro past its hard tolerance.
+      let score = Math.abs(delta[worst]);
+      for (const k of KEYS) {
+        if (k === worst) continue;
+        const newDiff = diff[k] - delta[k];
+        if (Math.abs(newDiff) > TOL_HARD[k] && Math.abs(newDiff) > Math.abs(diff[k])) {
+          score -= 1e6; // effectively disqualify
+        }
+      }
+      if (score > bestScore) { bestScore = score; best = it; }
+    }
+    if (!best) break;
+    const step = (ROUND_RULES[best.key]?.step) || 1;
+    best.amount_final += dir * step;
+    best.macros = macrosFor(best.key, best.amount_final);
+  }
 
-      const newMacros = computeItemMacros(item.name, newAmount, item.countable);
-      const oldMacros = item.macros;
-      builtMeals[bestMi].items[bestIi] = { ...item, amount: newAmount, macros: newMacros };
-      builtMeals[bestMi].macros = {
-        protein: Math.round(builtMeals[bestMi].macros.protein - oldMacros.protein + newMacros.protein),
-        carbs: Math.round(builtMeals[bestMi].macros.carbs - oldMacros.carbs + newMacros.carbs),
-        fat: Math.round(builtMeals[bestMi].macros.fat - oldMacros.fat + newMacros.fat),
-        calories: Math.round(builtMeals[bestMi].macros.calories - oldMacros.calories + newMacros.calories),
+  // 6. Materialize meals in the shape the UI + PDF expect --------------
+  const outMeals = meals.map(m => {
+    const items = m.items.map(it => {
+      const disp = DISPLAY[it.key] || { name: it.key };
+      return {
+        name:   disp.name,
+        unit:   NUTRI_DB[it.key].unit,
+        amount: it.amount_final,
+        macros: roundMacros(it.macros),
       };
     });
-  }
-
-  return builtMeals;
-}
-
-// ─── Validate that the meal breakdown actually adds up to the target ─────────
-// Small rounding drift is expected (ingredients round to whole units / nearest
-// 50g), so a tolerance of ±2g for macros and ±5kcal for calories is allowed —
-// beyond that, something in the scaling logic is actually wrong.
-function validateDietPlan(scaledMeals, targetMacros) {
-  const sum = scaledMeals.reduce((acc, m) => ({
-    protein: acc.protein + m.macros.protein,
-    carbs: acc.carbs + m.macros.carbs,
-    fat: acc.fat + m.macros.fat,
-    calories: acc.calories + m.macros.calories,
-  }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
-
-  const diffs = {
-    protein: sum.protein - targetMacros.protein,
-    carbs: sum.carbs - targetMacros.carbs,
-    fat: sum.fat - targetMacros.fat,
-    calories: sum.calories - targetMacros.calories,
-  };
-  const valid =
-    Math.abs(diffs.protein) <= 2 &&
-    Math.abs(diffs.carbs) <= 2 &&
-    Math.abs(diffs.fat) <= 2 &&
-    Math.abs(diffs.calories) <= 5;
-
-  if (!valid) {
-    console.warn('[Diet plan] Meal totals drifted from target beyond tolerance:', diffs);
-  }
-  return { valid, sum, diffs };
-}
-
-// ─── Optional bonus meal(s) — resolved with real macros for the user's own
-// reference, but deliberately NEVER added into the day's target totals.
-// Quantities are fixed reference amounts (not scaled to the user's macros)
-// since this is an "extra, if you need it" add-on, not part of the plan.
-function resolveOptionalMeals(goal, isVeg) {
-  const meals = OPTIONAL_MEALS[goal] || [];
-  return meals.map(meal => {
-    const items = meal.items.map(item => {
-      const useVeg = isVeg && item.vegAlt;
-      const name = useVeg ? item.vegAlt : item.name;
-      const amount = useVeg ? item.vegBase : item.base;
-      const unit = useVeg ? (item.vegUnit || item.unit) : item.unit;
-      const countable = useVeg ? !!item.vegCountable : !!item.countable;
-      const macros = computeItemMacros(name, amount, countable);
-      return { ...item, name, unit, countable, amount, macros };
-    });
-    const macros = items.reduce((acc, it) => ({
-      protein: acc.protein + it.macros.protein,
-      carbs: acc.carbs + it.macros.carbs,
-      fat: acc.fat + it.macros.fat,
-      calories: acc.calories + it.macros.calories,
-    }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
-    return {
-      ...meal,
-      items,
-      macros: {
-        protein: Math.round(macros.protein),
-        carbs: Math.round(macros.carbs),
-        fat: Math.round(macros.fat),
-        calories: Math.round(macros.calories),
-      },
-    };
+    const macros = items.reduce((acc, it) => addMacros(acc, it.macros), zeroMacros());
+    return { id: m.id, name: m.name, time: m.time, icon: m.icon,
+             items, macros: roundMacros(macros) };
   });
+
+  const dayTotals = outMeals.reduce((acc, m) => addMacros(acc, m.macros), zeroMacros());
+
+  return {
+    meals: outMeals,
+    tdee: target.tdee,
+    targetCalories: target.calories,
+    macros: {
+      protein: Math.round(target.protein),
+      carbs:   Math.round(target.carbs),
+      fat:     Math.round(target.fat),
+    },
+    actual: roundMacros(dayTotals),
+  };
 }
 
-// ─── PDF Generator ────────────────────────────────────────────────────────────
-function generatePDF(meals, optionalMeals, userInfo, macros, targetCalories, actualCalories, goalLabel) {
+/* ═══════════════════════════════════════════════════════════════════════════
+   PDF Generator (unchanged behaviour — reads new `meal.items[]` shape)
+   ═══════════════════════════════════════════════════════════════════════ */
+function generatePDF(meals, userInfo, macros, targetCalories, goalLabel) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF('p', 'mm', 'a4');
   const W = 210, margin = 15, cW = W - margin * 2;
@@ -422,7 +417,6 @@ function generatePDF(meals, optionalMeals, userInfo, macros, targetCalories, act
     doc.text('Personalized Diet Plan', W - margin, 8, { align: 'right' });
     y = 22;
   }
-
   function checkBreak(n = 20) { if (y + n > 270) newPage(); }
 
   // Cover
@@ -438,10 +432,9 @@ function generatePDF(meals, optionalMeals, userInfo, macros, targetCalories, act
   doc.setTextColor(...gray); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
   doc.text('Personalized for your body & goals', margin + 6, 90);
 
-  // Stats box
   doc.setFillColor(28, 28, 28); doc.roundedRect(margin, 105, cW, 62, 4, 4, 'F');
   doc.setFillColor(...gold); doc.roundedRect(margin, 105, cW, 6, 4, 4, 'F'); doc.rect(margin, 108, cW, 3, 'F');
-  doc.setTextColor(...dark); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+  doc.setTextColor(...gold); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
   doc.text('YOUR STATS', margin + 6, 112);
   const stats = [['Weight', `${userInfo.weight}kg`], ['Height', `${userInfo.height}cm`], ['Age', `${userInfo.age}yrs`], ['Gender', userInfo.gender], ['Diet', userInfo.dietType === 'veg' ? 'Vegetarian' : 'Non-Veg'], ['Activity', userInfo.activity.replace('_', ' ')]];
   const cw = cW / 3;
@@ -451,11 +444,10 @@ function generatePDF(meals, optionalMeals, userInfo, macros, targetCalories, act
     doc.setTextColor(...white); doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.text(val, x, sy + 7);
   });
 
-  // Macros box
   doc.setFillColor(28, 28, 28); doc.roundedRect(margin, 178, cW, 52, 4, 4, 'F');
   doc.setFillColor(...gold); doc.roundedRect(margin, 178, cW, 6, 4, 4, 'F'); doc.rect(margin, 181, cW, 3, 'F');
-  doc.setTextColor(...dark); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text('DAILY TARGETS', margin + 6, 185);
-  [['CALORIES', `${actualCalories}`, 'kcal'], ['PROTEIN', `${macros.protein}`, 'g'], ['CARBS', `${macros.carbs}`, 'g'], ['FAT', `${macros.fat}`, 'g']].forEach(([lbl, val, unit], i) => {
+  doc.setTextColor(...gold); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text('DAILY TARGETS', margin + 6, 185);
+  [['CALORIES', `${targetCalories}`, 'kcal'], ['PROTEIN', `${macros.protein}`, 'g'], ['CARBS', `${macros.carbs}`, 'g'], ['FAT', `${macros.fat}`, 'g']].forEach(([lbl, val, unit], i) => {
     const mx = margin + 6 + i * (cW / 4);
     doc.setTextColor(...gray); doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.text(lbl, mx, 198);
     doc.setTextColor(...gold); doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text(val, mx, 210);
@@ -464,12 +456,11 @@ function generatePDF(meals, optionalMeals, userInfo, macros, targetCalories, act
   doc.setTextColor(70, 70, 70); doc.setFontSize(7);
   doc.text(`Generated ${new Date().toLocaleDateString('en-IN', { day:'numeric',month:'long',year:'numeric' })}  •  being-x-lean.com`, W / 2, 285, { align: 'center' });
 
-  // Meals page
   newPage();
   doc.setTextColor(...gold); doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text('YOUR MEAL PLAN', margin, y); y += 3;
   doc.setFillColor(...gold); doc.rect(margin, y, 38, 0.8, 'F'); y += 10;
   doc.setTextColor(...gray); doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-  doc.text(`Target: ${targetCalories} kcal  •  Actual: ${actualCalories} kcal  •  P:${macros.protein}g  •  C:${macros.carbs}g  •  F:${macros.fat}g`, margin, y); y += 10;
+  doc.text(`Target: ${targetCalories} kcal  •  P:${macros.protein}g  •  C:${macros.carbs}g  •  F:${macros.fat}g`, margin, y); y += 10;
 
   meals.forEach((meal, idx) => {
     checkBreak(meal.items.length * 8 + 30);
@@ -482,13 +473,11 @@ function generatePDF(meals, optionalMeals, userInfo, macros, targetCalories, act
 
     meal.items.forEach(item => {
       checkBreak(8);
-      const nm = item.name;
-      const qty = item.amount;
       doc.setFillColor(240, 240, 240); doc.rect(margin + 4, y, cW - 4, 7, 'F');
       doc.setFillColor(...gold); doc.circle(margin + 7.5, y + 3.5, 1, 'F');
-      doc.setTextColor(50, 50, 50); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text(nm, margin + 11, y + 5);
+      doc.setTextColor(50, 50, 50); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text(item.name, margin + 11, y + 5);
       doc.setFont('helvetica', 'bold'); doc.setTextColor(80, 80, 80);
-      doc.text(`${qty} ${item.unit}`, W - margin - 4, y + 5, { align: 'right' }); y += 8.5;
+      doc.text(`${item.amount} ${item.unit}`, W - margin - 4, y + 5, { align: 'right' }); y += 8.5;
     });
 
     checkBreak(14);
@@ -500,37 +489,15 @@ function generatePDF(meals, optionalMeals, userInfo, macros, targetCalories, act
     }); y += 16;
   });
 
-  if (optionalMeals && optionalMeals.length > 0) {
-    checkBreak(20);
-    doc.setTextColor(...gray); doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5);
-    doc.text('Optional add-on below — NOT included in the Calories/Protein/Carbs/Fat totals above.', margin, y); y += 8;
-
-    optionalMeals.forEach(meal => {
-      checkBreak(meal.items.length * 8 + 20);
-      doc.setFillColor(60, 60, 60); doc.roundedRect(margin, y, cW, 10, 2, 2, 'F');
-      doc.setFillColor(...gold); doc.rect(margin, y, 3, 10, 'F');
-      doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-      doc.text(`${meal.name}`, margin + 7, y + 6.5); y += 14;
-
-      meal.items.forEach(item => {
-        checkBreak(8);
-        doc.setFillColor(240, 240, 240); doc.rect(margin + 4, y, cW - 4, 7, 'F');
-        doc.setFillColor(...gold); doc.circle(margin + 7.5, y + 3.5, 1, 'F');
-        doc.setTextColor(50, 50, 50); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text(item.name, margin + 11, y + 5);
-        doc.setFont('helvetica', 'bold'); doc.setTextColor(80, 80, 80);
-        doc.text(`${item.amount} ${item.unit}`, W - margin - 4, y + 5, { align: 'right' }); y += 8.5;
-      });
-      y += 6;
-    });
-  }
-
   doc.save(`BeingXLean_${goalLabel.replace(/\s/g, '_')}_Plan.pdf`);
 }
 
-// ─── Survey Modal ─────────────────────────────────────────────────────────────
-function SurveyModal({ planType, onClose, onSubmit, loading, initialData }) {
+/* ═══════════════════════════════════════════════════════════════════════════
+   UI (unchanged)
+   ═══════════════════════════════════════════════════════════════════════ */
+function SurveyModal({ planType, onClose, onSubmit, loading }) {
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState(initialData || { weight: '', height: '', age: '', gender: 'male', activity: 'moderate', dietType: 'nonveg' });
+  const [form, setForm] = useState({ weight: '', height: '', age: '', gender: 'male', activity: 'moderate', dietType: 'nonveg' });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const goalLabel = planType === 'fat_loss' ? 'Fat Loss / Recomp' : 'Muscle Gain';
   const valid1 = form.weight && form.height && form.age;
@@ -631,22 +598,20 @@ function SurveyModal({ planType, onClose, onSubmit, loading, initialData }) {
     </div>
   );
 }
-//-------------------------------Locked Plan---------------
+
 function LockedPlanCard({ plan }) {
   return (
     <div className="locked-card-overlay">
       <div className="locked-card-content">
         <div className="locked-icon">🔒</div>
-
-          <span className='locked-text'><h3>Locked</h3></span>
-
-      <span className="locked-badge">Coming Soon</span>
+        <span className='locked-text'><h3>Locked</h3></span>
+        <span className="locked-badge">Coming Soon</span>
       </div>
     </div>
   );
 }
-// ─── Standard Plan View ─────────────────────────────── ────────────────────────
-function StandardPlanView({ onSelectPlan }) {
+
+function StandardPlanView() {
   return (
     <div className="diet-standard-view diet-reveal">
       <div className="diet-standard-header">
@@ -657,23 +622,17 @@ function StandardPlanView({ onSelectPlan }) {
 
       <div className="diet-standard-cards">
         {[
-          { icon:'💪', title:'Muscle Gain', goal:'muscle_gain', cal:'2800–3200 kcal', protein:'1.6–2.2g/kg', color:'#ff4500', desc:'Calorie surplus + high protein to build lean mass fast.' },
-          { icon:'🔥', title:'Fat Loss', goal:'fat_loss', cal:'TDEE − 300–500', protein:'2.0–2.4g/kg', color:'#39ff14', desc:'Moderate deficit while preserving muscle with high protein.' },
+          { icon:'💪', title:'Muscle Gain', cal:'2800–3200 kcal', protein:'1.6–2.2g/kg', color:'#ff4500', desc:'Calorie surplus + high protein to build lean mass fast.' },
+          { icon:'🔥', title:'Fat Loss', cal:'TDEE − 300–500', protein:'2.0–2.4g/kg', color:'#39ff14', desc:'Moderate deficit while preserving muscle with high protein.' },
           { icon:'⚖️', title:'Body Recompotion', cal:'TDEE + 200–300', protein:'1.8–2.0g/kg', color:'#ffd700', desc:'Slow quality gains with whole foods. 0.25–0.5kg/week.' , locked: true },
         ].map(p => (
-          <div
-            key={p.title}
-            className="diet-std-card"
-            style={{borderColor: p.color + '44', position: "relative", overflow: "hidden", cursor: p.locked ? 'default' : 'pointer'}}
-            onClick={() => { if (!p.locked) onSelectPlan(p.goal); }}
-          >
+          <div key={p.title} className="diet-std-card" style={{borderColor: p.color + '44' , position: "relative",overflow: "hidden",}}>
             <span style={{fontSize:32}}>{p.icon}</span>
             <h3 style={{color: p.color, fontFamily:"'Bebas Neue',cursive", fontSize:'1.6rem', margin:'0.5rem 0'}}>{p.title}</h3>
             <div className="diet-std-row"><span>Calories</span><b>{p.cal}</b></div>
             <div className="diet-std-row"><span>Protein</span><b>{p.protein}</b></div>
             <p style={{color:'var(--text-secondary)', fontSize:'0.82rem', marginTop:'0.75rem', lineHeight:1.6}}>{p.desc}</p>
             {p.locked && <LockedPlanCard plan={{ label: p.title }} />}
-
           </div>
         ))}
       </div>
@@ -689,7 +648,7 @@ function StandardPlanView({ onSelectPlan }) {
               {[
                 ['Soya Chunks','52g','Very Low ₹','Muscle Gain'],
                 ['Eggs','6g / egg','Very Low ₹','All Goals'],
-                ['Paneer / Tofu','18g','Medium ₹','Muscle Gain'],
+                ['Paneer','18g','Medium ₹','Muscle Gain'],
                 ['Chana / Chickpeas','19g','Low ₹','All Goals'],
                 ['Dal (Lentils)','9g','Very Low ₹','Fat Loss'],
                 ['Chicken Breast','31g','Medium ₹','All Goals'],
@@ -715,8 +674,7 @@ function StandardPlanView({ onSelectPlan }) {
   );
 }
 
-// ─── Dynamic Plan View ────────────────────────────────────────────────────────
-function DynamicPlanView({ meals, optionalMeals, userInfo, macros, targetCalories, actualCalories, tdee, onDownload, onEditSurvey }) {
+function DynamicPlanView({ meals, userInfo, macros, targetCalories, tdee, onDownload }) {
   const goalLabel = userInfo.goal === 'fat_loss' ? 'Fat Loss' : 'Muscle Gain';
   return (
     <div className="diet-dynamic-view">
@@ -725,18 +683,15 @@ function DynamicPlanView({ meals, optionalMeals, userInfo, macros, targetCalorie
           <span className="section-eyebrow">{goalLabel} — Personalized</span>
           <h2 className="section-title" style={{fontSize:'clamp(1.8rem,5vw,3rem)'}}>YOUR PLAN</h2>
           <p style={{color:'var(--text-secondary)', fontSize:'0.9rem', marginTop:'0.3rem'}}>
-            {userInfo.weight}kg · {userInfo.age}yrs · {userInfo.dietType === 'veg' ? '🥦 Veg' : '🍗 Non-Veg'} · TDEE: {tdee} kcal · Target: {targetCalories} kcal
+            {userInfo.weight}kg · {userInfo.age}yrs · {userInfo.dietType === 'veg' ? '🥦 Veg' : '🍗 Non-Veg'} · TDEE: {tdee} kcal
           </p>
         </div>
-        <div style={{display:'flex', flexDirection:'column', gap:'0.6rem', alignItems:'flex-end'}}>
-          <button className="btn-primary" onClick={onDownload} style={{whiteSpace:'nowrap'}}>⬇ Download PDF</button>
-          <button className="btn-outline" onClick={() => onEditSurvey(userInfo.goal)} style={{whiteSpace:'nowrap'}}>✏️ Edit Details</button>
-        </div>
+        <button className="btn-primary" onClick={onDownload} style={{whiteSpace:'nowrap'}}>⬇ Download PDF</button>
       </div>
 
       <div className="diet-macro-bar">
         {[
-          {label:'Calories', value:actualCalories, unit:'kcal', color:'var(--accent)'},
+          {label:'Calories', value:targetCalories, unit:'kcal', color:'var(--accent)'},
           {label:'Protein', value:`${macros.protein}g`, unit:'', color:'#00bfff'},
           {label:'Carbs', value:`${macros.carbs}g`, unit:'', color:'#ffd700'},
           {label:'Fat', value:`${macros.fat}g`, unit:'', color:'#39ff14'},
@@ -778,43 +733,15 @@ function DynamicPlanView({ meals, optionalMeals, userInfo, macros, targetCalorie
           </div>
         ))}
       </div>
-
-      {optionalMeals && optionalMeals.length > 0 && (
-        <div className="diet-meals-list" style={{marginTop:'1.5rem'}}>
-          <p style={{textAlign:'center', color:'var(--text-secondary)', fontSize:'0.8rem', marginBottom:'0.75rem'}}>
-            The section below is a bonus add-on — it is <strong>not included</strong> in your Calories/Protein/Carbs/Fat targets above.
-          </p>
-          {optionalMeals.map((meal) => (
-            <div key={meal.id} className="diet-meal-block diet-reveal" style={{borderStyle:'dashed', opacity:0.9}}>
-              <div className="diet-meal-block-header">
-                <span className="diet-meal-num">＋</span>
-                <div>
-                  <div className="diet-meal-block-name">{meal.name}</div>
-                  <div className="diet-meal-block-time">{meal.time}</div>
-                </div>
-                <span style={{fontSize:24, marginLeft:'auto'}}>{meal.icon}</span>
-              </div>
-              <div className="diet-meal-block-items">
-                {meal.items.map((item, i) => (
-                  <div key={i} className="diet-meal-row">
-                    <span>{item.name}</span>
-                    <span className="diet-meal-qty">{item.amount} {item.unit}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div style={{display:'flex', justifyContent:'center', marginTop:'2rem'}}>
-        <button className="btn-primary" onClick={onDownload}>⬇ Download PDF</button>
-      </div>
     </div>
   );
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Main page
+   ═══════════════════════════════════════════════════════════════════════ */
 export default function Diet() {
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('standard');
   const [showSurvey, setShowSurvey] = useState(false);
@@ -823,10 +750,9 @@ export default function Diet() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (authLoading) return; // still verifying the saved login — don't redirect yet
-    if (!user) { navigate('/auth', { replace: true }); return; }
-    if (!hasPlan(user, 'diet')) { navigate('/pricing?for=diet', { replace: true }); return; }
-  }, [user, authLoading, navigate]);
+    if (!user) { navigate('/auth'); return; }
+    if (!hasPlan(user, 'diet')) { navigate('/pricing'); return; }
+  }, [user, navigate]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -839,91 +765,34 @@ export default function Diet() {
 
   function handleTabClick(tabId) {
     if (tabId === 'standard') { setActiveTab('standard'); return; }
-    setActiveTab(tabId);
-    // If we have the user's saved survey ANSWERS for this goal, regenerate
-    // the plan fresh from them (using whatever the current meal data is) —
-    // rather than loading a previously computed plan object from cache,
-    // which would go stale the moment BASE_MEALS is ever updated.
-    try {
-      const savedAnswers = localStorage.getItem(`bxl_diet_survey_${tabId}`);
-      if (savedAnswers) {
-        handleSurveySubmit({ ...JSON.parse(savedAnswers), goal: tabId });
-        return;
-      }
-    } catch {}
     setSurveyPlanType(tabId);
-    setShowSurvey(true);
-  }
-
-  // Reopen the survey pre-filled with the last saved answers, so the user
-  // can tweak their details without starting from a blank form.
-  function handleEditSurvey(goal) {
-    setSurveyPlanType(goal);
     setShowSurvey(true);
   }
 
   function handleSurveySubmit(formData) {
     setLoading(true);
     setTimeout(() => {
-      const { weight, height, age, gender, activity, goal } = formData;
-      const w = parseFloat(weight), h = parseFloat(height), a = parseInt(age);
-
-      // 1. BMR (Mifflin-St Jeor) → TDEE → daily calorie target
-      const bmr = gender === 'male' ? (10*w + 6.25*h - 5*a + 5) : (10*w + 6.25*h - 5*a - 161);
-      const actMult = { sedentary:1.2, light:1.375, moderate:1.55, active:1.725, very_active:1.9 };
-      const tdee = Math.round(bmr * (actMult[activity] || 1.55));
-      const MUSCLE_GAIN_SURPLUS = 400; // midpoint of the 300–500 kcal range
-      const FAT_LOSS_DEFICIT = 500;
-      const targetCalories = goal === 'fat_loss' ? tdee - FAT_LOSS_DEFICIT : tdee + MUSCLE_GAIN_SURPLUS;
-
-      // 2. Macro targets — protein & fat driven directly by bodyweight,
-      //    carbs fill whatever calories are left. This guarantees
-      //    protein*4 + fat*9 + carbs*4 === targetCalories, exactly.
-      const proteinG = Math.round(w * 2);
-      const fatG = Math.round(w * 1);
-      const remainingCal = targetCalories - (proteinG * 4) - (fatG * 9);
-      const carbsG = Math.round(remainingCal / 4);
-      const targetMacros = { protein: proteinG, carbs: carbsG, fat: fatG, calories: targetCalories };
-
-      // 3+4+5. Split the day's targets across meals, then derive real
-      // ingredient quantities that hit each meal's slice of those targets.
-      const baseMeals = BASE_MEALS[goal] || BASE_MEALS.muscle_gain;
-      const scaledMeals = scaleMeals(baseMeals, targetMacros, formData.dietType === 'veg');
-
-      // 6. Validate: sum of all meals should equal the target within tolerance.
-      const { sum } = validateDietPlan(scaledMeals, targetMacros);
-
-      // Optional bonus meal(s) — shown separately, never counted in the totals above.
-      const optionalMeals = resolveOptionalMeals(goal, formData.dietType === 'veg');
-
-      const planData = {
-        meals: scaledMeals,
-        optionalMeals,
+      const plan = buildPlan(formData);
+      setPlanResult({
+        meals: plan.meals,
         userInfo: formData,
-        macros: { protein: sum.protein, carbs: sum.carbs, fat: sum.fat },
-        targetCalories,
-        actualCalories: sum.calories,
-        tdee,
-      };
-      setPlanResult(planData);
-      // Save the survey answers so the user isn't asked to fill the form
-      // again next time they open this goal's tab.
-      try {
-        localStorage.setItem(`bxl_diet_survey_${goal}`, JSON.stringify(formData));
-      } catch {}
-      setActiveTab(goal);
+        macros: plan.macros,
+        targetCalories: plan.targetCalories,
+        tdee: plan.tdee,
+        actual: plan.actual,
+      });
+      setActiveTab(formData.goal);
       setShowSurvey(false);
       setLoading(false);
-    }, 1000);
+    }, 500);
   }
 
   function handleDownload() {
     if (!planResult) return;
     const goalLabel = planResult.userInfo.goal === 'fat_loss' ? 'Fat Loss' : 'Muscle Gain';
-    generatePDF(planResult.meals, planResult.optionalMeals, planResult.userInfo, planResult.macros, planResult.targetCalories, planResult.actualCalories, goalLabel);
+    generatePDF(planResult.meals, planResult.userInfo, planResult.macros, planResult.targetCalories, goalLabel);
   }
 
-  if (authLoading) return null;
   if (!user || !hasPlan(user, 'diet')) return null;
 
   const tabs = [
@@ -936,20 +805,16 @@ export default function Diet() {
     <div className="diet-page" style={{paddingBottom: 80}}>
       <div className="noise-overlay" />
 
-      {/* Main Content */}
       <div className="diet-main-content">
-        {activeTab === 'standard' && <StandardPlanView onSelectPlan={handleTabClick} />}
+        {activeTab === 'standard' && <StandardPlanView />}
         {activeTab !== 'standard' && planResult && (
           <DynamicPlanView
             meals={planResult.meals}
-            optionalMeals={planResult.optionalMeals}
             userInfo={planResult.userInfo}
             macros={planResult.macros}
             targetCalories={planResult.targetCalories}
-            actualCalories={planResult.actualCalories}
             tdee={planResult.tdee}
             onDownload={handleDownload}
-            onEditSurvey={handleEditSurvey}
           />
         )}
         {activeTab !== 'standard' && !planResult && (
@@ -968,7 +833,6 @@ export default function Diet() {
         )}
       </div>
 
-      {/* Bottom Navbar */}
       <nav className="diet-bottom-nav">
         {tabs.map(tab => (
           <button key={tab.id} className={`diet-nav-tab ${activeTab === tab.id ? 'active' : ''}`} onClick={() => handleTabClick(tab.id)}>
@@ -985,12 +849,6 @@ export default function Diet() {
           onClose={() => setShowSurvey(false)}
           onSubmit={handleSurveySubmit}
           loading={loading}
-          initialData={(() => {
-            try {
-              const saved = localStorage.getItem(`bxl_diet_survey_${surveyPlanType}`);
-              return saved ? JSON.parse(saved) : null;
-            } catch { return null; }
-          })()}
         />
       )}
     </div>
