@@ -117,8 +117,28 @@ const MEAL_SPLIT = {
   fat_loss:    { meal1: 0.15, meal2: 0.15, meal3: 0.30, meal4: 0.10, meal5: 0.30 },
 };
 
-function roundToNearest50(value) {
-  return Math.round(value / 50) * 50;
+// ─── Adaptive rounding for non-countable ingredient quantities ───────────────
+// BUG THIS FIXES: the old code rounded every gram/ml ingredient to the
+// nearest 50 with a hard floor of 50 (Math.max(50, roundToNearest50(x))).
+// That's fine for a 250g rice portion, but for small-base ingredients like
+// 15g of almonds or 30g of soya chunks, the *correctly scaled* value (e.g.
+// 6g, 12g, 18g...) always got clobbered up to a flat 50g regardless of the
+// user's stats — so those ingredient rows appeared "frozen" across weight/
+// height/age changes even though the underlying macro scaling was working.
+//
+// Fix: size the rounding step relative to each ingredient's own reference
+// (base) amount, so small-quantity ingredients can move in small, sensible
+// increments instead of being clamped to a giant minimum. Quantities still
+// come out as clean, practical numbers — just not all forced onto a 50g grid.
+function smartRoundGrams(rawAmount, baseAmount) {
+  let step;
+  if (baseAmount <= 20) step = 1;        // e.g. almonds, mixed seeds
+  else if (baseAmount <= 60) step = 5;   // e.g. soya chunks, brown bread
+  else if (baseAmount <= 150) step = 10; // e.g. oats, curd, sabzi
+  else step = 25;                        // e.g. rice/roti, dal, milk
+
+  const rounded = Math.round(rawAmount / step) * step;
+  return Math.max(step, rounded);
 }
 
 // ─── Real nutrition data (per 100g/ml, or per single unit for countable items) ─
@@ -228,7 +248,7 @@ function scaleMeals(meals, targetMacros, isVeg, mealSplitMap) {
       const rawAmount = it.base * itemScale;
       const amount = it.countable
         ? Math.max(1, Math.round(rawAmount))
-        : Math.max(50, roundToNearest50(rawAmount));
+        : smartRoundGrams(rawAmount, it.base);
       const macros = computeItemMacros(it.name, amount, it.countable);
       return { ...it, amount, macros };
     });
@@ -255,9 +275,10 @@ function scaleMeals(meals, targetMacros, isVeg, mealSplitMap) {
 }
 
 // ─── Validate that the meal breakdown actually adds up to the target ─────────
-// Small rounding drift is expected (ingredients round to whole units / nearest
-// 50g), so a tolerance of ±2g for macros and ±5kcal for calories is allowed —
-// beyond that, something in the scaling logic is actually wrong.
+// Small rounding drift is expected (ingredients round to whole units / to a
+// step size relative to their own base amount), so a tolerance of ±2g for
+// macros and ±5kcal for calories is allowed — beyond that, something in the
+// scaling logic is actually wrong.
 function validateDietPlan(scaledMeals, targetMacros) {
   const sum = scaledMeals.reduce((acc, m) => ({
     protein: acc.protein + m.macros.protein,
