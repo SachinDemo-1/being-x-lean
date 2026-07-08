@@ -111,34 +111,8 @@ const OPTIONAL_MEALS = {
   ],
 };
 
-// ─── How much of the day's total macros each meal gets (must sum to 1.0) ─────
-const MEAL_SPLIT = {
-  muscle_gain: { meal1: 0.20, meal2: 0.20, meal3: 0.25, meal4: 0.15, meal5: 0.20 },
-  fat_loss:    { meal1: 0.15, meal2: 0.15, meal3: 0.30, meal4: 0.10, meal5: 0.30 },
-};
-
-// ─── Adaptive rounding for non-countable ingredient quantities ───────────────
-// BUG THIS FIXES: the old code rounded every gram/ml ingredient to the
-// nearest 50 with a hard floor of 50 (Math.max(50, roundToNearest50(x))).
-// That's fine for a 250g rice portion, but for small-base ingredients like
-// 15g of almonds or 30g of soya chunks, the *correctly scaled* value (e.g.
-// 6g, 12g, 18g...) always got clobbered up to a flat 50g regardless of the
-// user's stats — so those ingredient rows appeared "frozen" across weight/
-// height/age changes even though the underlying macro scaling was working.
-//
-// Fix: size the rounding step relative to each ingredient's own reference
-// (base) amount, so small-quantity ingredients can move in small, sensible
-// increments instead of being clamped to a giant minimum. Quantities still
-// come out as clean, practical numbers — just not all forced onto a 50g grid.
-function smartRoundGrams(rawAmount, baseAmount) {
-  let step;
-  if (baseAmount <= 20) step = 1;        // e.g. almonds, mixed seeds
-  else if (baseAmount <= 60) step = 5;   // e.g. soya chunks, brown bread
-  else if (baseAmount <= 150) step = 10; // e.g. oats, curd, sabzi
-  else step = 25;                        // e.g. rice/roti, dal, milk
-
-  const rounded = Math.round(rawAmount / step) * step;
-  return Math.max(step, rounded);
+function roundToNearest5(value) {
+  return Math.round(value / 5) * 5;
 }
 
 // ─── Real nutrition data (per 100g/ml, or per single unit for countable items) ─
@@ -183,72 +157,110 @@ const NUTRITION = {
 function computeItemMacros(name, amount, isCountable) {
   const entry = NUTRITION[name];
   if (!entry) return { protein: 0, carbs: 0, fat: 0, calories: 0 };
-  if (isCountable && entry.perUnit) {
-    const u = entry.perUnit;
-    return { protein: u.p * amount, carbs: u.c * amount, fat: u.f * amount, calories: u.cal * amount };
-  }
-  const ref = entry.per100 || entry.perUnit;
-  const factor = amount / 100;
-  return { protein: ref.p * factor, carbs: ref.c * factor, fat: ref.f * factor, calories: ref.cal * factor };
+  const ref = (isCountable && entry.perUnit) ? entry.perUnit : (entry.per100 || entry.perUnit);
+  const factor = (isCountable && entry.perUnit) ? amount : amount / 100;
+  const protein = ref.p * factor, carbs = ref.c * factor, fat = ref.f * factor;
+  // Calories are ALWAYS derived from the macros themselves (4 kcal/g protein,
+  // 4 kcal/g carbs, 9 kcal/g fat) rather than a separately-labeled number —
+  // this is what guarantees that hitting the protein/carb/fat targets
+  // automatically means the calorie target is hit too, with no separate
+  // source of drift between them.
+  const calories = protein * 4 + carbs * 4 + fat * 9;
+  return { protein, carbs, fat, calories };
 }
 
 // ─── Scale meals from TARGET MACROS (not just a flat calorie ratio) ───────────
-// For every meal: work out that meal's slice of the day's protein/carbs/fat/
-// calories (via MEAL_SPLIT), then scale each ingredient using how much it
-// contributes to protein vs carbs vs fat at baseline — a protein-dominant
-// ingredient (chicken/paneer/soya/whey) scales toward the protein target, a
-// carb-dominant one (oats/rice) scales toward the carb target, a fat-dominant
-// one (peanut butter/almonds) scales toward the fat target. Every ingredient's
-// final macros are then computed for real from its ACTUAL rounded quantity —
-// so meal totals are always the literal sum of what's on the plate, and the
-// day totals are always the literal sum of the meals. No hardcoded numbers.
-function scaleMeals(meals, targetMacros, isVeg, mealSplitMap) {
-  return meals.map(meal => {
-    const pct = mealSplitMap[meal.id] ?? (1 / meals.length);
-    const mealTarget = {
-      protein: targetMacros.protein * pct,
-      carbs: targetMacros.carbs * pct,
-      fat: targetMacros.fat * pct,
+// Two-phase approach across ALL meals in the plan:
+//  Phase A: work out, from each meal's OWN baseline ingredients, what share
+//    of the day's protein / carbs / fat it can realistically carry. A meal
+//    that's naturally protein-poor (e.g. oats+milk+banana) gets assigned a
+//    small protein-share and a bigger carb/fat-share — no meal is ever asked
+//    to hit a macro its food doesn't contain, which is what caused big drift.
+//  Phase B: for each meal, scale + correct its ingredients to hit that
+//    meal's own slice of the targets, then round for display. Every
+//    ingredient's final macros come from its ACTUAL rounded quantity, so
+//    meal totals are always the literal sum of what's on the plate, and day
+//    totals are always the literal sum of the meals. No hardcoded numbers.
+function scaleMeals(meals, targetMacros, isVeg) {
+  // Resolve veg/non-veg items once per meal up front.
+  const resolvedMeals = meals.map(meal => meal.items.map(item => {
+    const useVeg = isVeg && item.vegAlt;
+    return {
+      ...item,
+      name: useVeg ? item.vegAlt : item.name,
+      base: useVeg ? item.vegBase : item.base,
+      unit: useVeg ? (item.vegUnit || item.unit) : item.unit,
+      countable: useVeg ? !!item.vegCountable : !!item.countable,
     };
+  }));
 
-    // Resolve veg/non-veg name + base amount + unit + countable for every item
-    const resolved = meal.items.map(item => {
-      const useVeg = isVeg && item.vegAlt;
-      return {
-        ...item,
-        name: useVeg ? item.vegAlt : item.name,
-        base: useVeg ? item.vegBase : item.base,
-        unit: useVeg ? (item.vegUnit || item.unit) : item.unit,
-        countable: useVeg ? !!item.vegCountable : !!item.countable,
-      };
-    });
-
-    // Real macros for every ingredient AT its reference (baseline) amount
-    const baseline = resolved.map(it => computeItemMacros(it.name, it.base, it.countable));
-    const baseTotal = baseline.reduce((acc, m) => ({
-      protein: acc.protein + m.protein,
-      carbs: acc.carbs + m.carbs,
-      fat: acc.fat + m.fat,
+  // Phase A — each meal's baseline macro totals, then its share of the day.
+  const mealBaselines = resolvedMeals.map(items => {
+    const b = items.map(it => computeItemMacros(it.name, it.base, it.countable));
+    return b.reduce((acc, m) => ({
+      protein: acc.protein + m.protein, carbs: acc.carbs + m.carbs, fat: acc.fat + m.fat,
     }), { protein: 0, carbs: 0, fat: 0 });
+  });
+  const dayBaseline = mealBaselines.reduce((acc, m) => ({
+    protein: acc.protein + m.protein, carbs: acc.carbs + m.carbs, fat: acc.fat + m.fat,
+  }), { protein: 0, carbs: 0, fat: 0 });
 
-    // Independent scale factor per macro (guarded against divide-by-zero)
+  const mealTargets = mealBaselines.map(mb => ({
+    protein: dayBaseline.protein > 0 ? targetMacros.protein * (mb.protein / dayBaseline.protein) : targetMacros.protein / meals.length,
+    carbs:   dayBaseline.carbs  > 0 ? targetMacros.carbs  * (mb.carbs  / dayBaseline.carbs)  : targetMacros.carbs  / meals.length,
+    fat:     dayBaseline.fat   > 0 ? targetMacros.fat    * (mb.fat    / dayBaseline.fat)    : targetMacros.fat    / meals.length,
+  }));
+
+  // Phase B — scale + correct + round each meal against its own target slice.
+  const builtMeals = meals.map((meal, mi) => {
+    const resolved = resolvedMeals[mi];
+    const mealTarget = mealTargets[mi];
+    const baseline = resolved.map(it => computeItemMacros(it.name, it.base, it.countable));
+    const baseTotal = mealBaselines[mi];
+
     const pScale = baseTotal.protein > 0 ? mealTarget.protein / baseTotal.protein : 1;
     const cScale = baseTotal.carbs  > 0 ? mealTarget.carbs  / baseTotal.carbs  : 1;
     const fScale = baseTotal.fat    > 0 ? mealTarget.fat    / baseTotal.fat    : 1;
 
-    const items = resolved.map((it, i) => {
+    // STEP 1 — initial guess: macro-weighted blend per ingredient.
+    let rawAmounts = resolved.map((it, i) => {
       const b = baseline[i];
       const macroSum = b.protein + b.carbs + b.fat;
-      // Macro-weighted blend: an ingredient that's mostly protein scales
-      // almost entirely with pScale; mostly-carb with cScale; mostly-fat
-      // with fScale. Mixed ingredients (e.g. dal) scale by a blend of both.
       const itemScale = macroSum > 0
         ? (b.protein * pScale + b.carbs * cScale + b.fat * fScale) / macroSum
         : 1;
-      const rawAmount = it.base * itemScale;
+      return it.base * itemScale;
+    });
+
+    const density = resolved.map(it => computeItemMacros(it.name, it.countable ? 1 : 100, it.countable));
+
+    // STEP 2 — correction pass: close the remaining gap on each macro using
+    // the ingredient most associated with it. Repeated several times because
+    // correcting one macro can slightly disturb another (e.g. peanut butter
+    // carries both fat AND some carbs) — each extra pass cancels that out
+    // further, converging toward an exact match on the pre-rounding numbers.
+    for (let pass = 0; pass < 6; pass++) {
+      ['protein', 'carbs', 'fat'].forEach(key => {
+        const current = resolved.reduce((acc, it, i) => acc + computeItemMacros(it.name, rawAmounts[i], it.countable)[key], 0);
+        const gap = mealTarget[key] - current;
+        if (Math.abs(gap) < 0.01) return;
+
+        let anchorIdx = -1, maxShare = 0;
+        baseline.forEach((b, i) => { if (b[key] > maxShare) { maxShare = b[key]; anchorIdx = i; } });
+        if (anchorIdx === -1) return;
+
+        const perUnit = density[anchorIdx][key];
+        if (!perUnit || perUnit <= 0) return;
+        const unitsNeeded = resolved[anchorIdx].countable ? (gap / perUnit) : (gap / perUnit) * 100;
+        rawAmounts[anchorIdx] = Math.max(0, rawAmounts[anchorIdx] + unitsNeeded);
+      });
+    }
+
+    // STEP 3 — round for display and compute each item's FINAL real macros.
+    const items = resolved.map((it, i) => {
       const amount = it.countable
-        ? Math.max(1, Math.round(rawAmount))
-        : smartRoundGrams(rawAmount, it.base);
+        ? Math.max(1, Math.round(rawAmounts[i]))
+        : Math.max(5, roundToNearest5(rawAmounts[i]));
       const macros = computeItemMacros(it.name, amount, it.countable);
       return { ...it, amount, macros };
     });
@@ -272,13 +284,65 @@ function scaleMeals(meals, targetMacros, isVeg, mealSplitMap) {
       },
     };
   });
+
+  // Phase C — day-wide final correction. Per-meal correction (above) can
+  // still leave a small day-level gap when the same ingredient gets pulled
+  // in two directions across different meals. This pass looks across ALL
+  // meals at once and nudges whichever ingredient is most associated with
+  // any remaining protein/carbs/fat gap — preferring gram-based ingredients
+  // (fine 5g adjustments) over countable ones (coarse whole-unit jumps,
+  // e.g. a whey scoop swings protein by ~24g at a time) so the correction
+  // can actually land close to the target instead of overshooting. Run
+  // several times since fixing one macro can slightly disturb another.
+  for (let pass = 0; pass < 5; pass++) {
+    ['protein', 'carbs', 'fat'].forEach(key => {
+      const daySum = builtMeals.reduce((acc, m) => acc + m.macros[key], 0);
+      const gap = targetMacros[key] - daySum;
+      if (Math.abs(gap) < 0.5) return;
+
+      let bestMi = -1, bestIi = -1, bestContribution = 0;
+      let bestCountableMi = -1, bestCountableIi = -1, bestCountableContribution = 0;
+      builtMeals.forEach((m, mi) => {
+        m.items.forEach((it, ii) => {
+          if (it.countable) {
+            if (it.macros[key] > bestCountableContribution) { bestCountableContribution = it.macros[key]; bestCountableMi = mi; bestCountableIi = ii; }
+          } else if (it.macros[key] > bestContribution) {
+            bestContribution = it.macros[key]; bestMi = mi; bestIi = ii;
+          }
+        });
+      });
+      // Prefer a gram-based ingredient (fine control); only fall back to a
+      // countable one if nothing gram-based actually contains this macro.
+      if (bestMi === -1) { bestMi = bestCountableMi; bestIi = bestCountableIi; }
+      if (bestMi === -1) return;
+
+      const item = builtMeals[bestMi].items[bestIi];
+      const perUnit = computeItemMacros(item.name, item.countable ? 1 : 100, item.countable)[key];
+      if (!perUnit || perUnit <= 0) return;
+      const unitsNeeded = item.countable ? (gap / perUnit) : (gap / perUnit) * 100;
+      const newAmount = item.countable
+        ? Math.max(1, Math.round(item.amount + unitsNeeded))
+        : Math.max(5, roundToNearest5(item.amount + unitsNeeded));
+
+      const newMacros = computeItemMacros(item.name, newAmount, item.countable);
+      const oldMacros = item.macros;
+      builtMeals[bestMi].items[bestIi] = { ...item, amount: newAmount, macros: newMacros };
+      builtMeals[bestMi].macros = {
+        protein: Math.round(builtMeals[bestMi].macros.protein - oldMacros.protein + newMacros.protein),
+        carbs: Math.round(builtMeals[bestMi].macros.carbs - oldMacros.carbs + newMacros.carbs),
+        fat: Math.round(builtMeals[bestMi].macros.fat - oldMacros.fat + newMacros.fat),
+        calories: Math.round(builtMeals[bestMi].macros.calories - oldMacros.calories + newMacros.calories),
+      };
+    });
+  }
+
+  return builtMeals;
 }
 
 // ─── Validate that the meal breakdown actually adds up to the target ─────────
-// Small rounding drift is expected (ingredients round to whole units / to a
-// step size relative to their own base amount), so a tolerance of ±2g for
-// macros and ±5kcal for calories is allowed — beyond that, something in the
-// scaling logic is actually wrong.
+// Small rounding drift is expected (ingredients round to whole units / nearest
+// 50g), so a tolerance of ±2g for macros and ±5kcal for calories is allowed —
+// beyond that, something in the scaling logic is actually wrong.
 function validateDietPlan(scaledMeals, targetMacros) {
   const sum = scaledMeals.reduce((acc, m) => ({
     protein: acc.protein + m.macros.protein,
@@ -824,8 +888,7 @@ export default function Diet() {
       // 3+4+5. Split the day's targets across meals, then derive real
       // ingredient quantities that hit each meal's slice of those targets.
       const baseMeals = BASE_MEALS[goal] || BASE_MEALS.muscle_gain;
-      const mealSplit = MEAL_SPLIT[goal] || MEAL_SPLIT.muscle_gain;
-      const scaledMeals = scaleMeals(baseMeals, targetMacros, formData.dietType === 'veg', mealSplit);
+      const scaledMeals = scaleMeals(baseMeals, targetMacros, formData.dietType === 'veg');
 
       // 6. Validate: sum of all meals should equal the target within tolerance.
       const { sum } = validateDietPlan(scaledMeals, targetMacros);
