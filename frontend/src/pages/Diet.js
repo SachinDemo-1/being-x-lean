@@ -24,6 +24,10 @@ import './Diet.css';
 //  • Quantities round to realistic, clean numbers (nearest 25g for rice/
 //    potato, nearest 10g for oats, nearest 5g for small toppings, whole
 //    pieces for countable foods) — never odd decimals.
+//  • HARD MINIMUMS: a dynamic food can carry a `min` (e.g. Soya Chunks
+//    min: 50) — a floor that is enforced AFTER rounding/solving, so the
+//    macro solver can still scale it up but it can never drop below the
+//    minimum no matter what the day's remaining target looks like.
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ─── Nutrition per 100g/100ml (gram-based) or per single unit (countable:
@@ -102,7 +106,7 @@ const BASE_MEALS = {
       ] },
     { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜',
       items: [
-        { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 50, round: 5 },
+        { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 50, round: 5, min: 50 },
         { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
       ] },
     { id: 'meal5', name: 'Dinner', time: '9:00 PM', icon: '🍲',
@@ -130,7 +134,7 @@ const BASE_MEALS = {
       items: [
         { name: 'Rice', role: 'dynamic', unit: 'g', base: 200, round: 25 },
         { name: 'Dal/Rajma + Sabzi', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 30, round: 5 },
+        { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 30, round: 5, min: 50 },
         { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
       ] },
     { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜',
@@ -231,11 +235,15 @@ function generateDietPlan(baseMeals, targetMacros) {
     });
   }
 
-  // Round every dynamic food to a realistic, clean quantity.
+  // Round every dynamic food to a realistic, clean quantity. Foods with a
+  // `min` (e.g. Soya Chunks — must NEVER go below 50g regardless of what
+  // the macro solver computes) are floored AFTER rounding, so they can
+  // still scale upward freely but can never dip under their hard minimum.
   const finalDynamic = dynamicItems.map((it, i) => {
-    const amount = it.countable
+    let amount = it.countable
       ? Math.max(1, Math.round(rawAmounts[i]))
       : roundToStep(rawAmounts[i], it.round || 10);
+    if (it.min) amount = Math.max(amount, it.min);
     return { ...it, amount, macros: computeItemMacros(it.name, amount, !!it.countable) };
   });
 
