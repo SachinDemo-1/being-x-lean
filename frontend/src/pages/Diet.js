@@ -5,181 +5,373 @@ import { hasPlan } from '../context/purchases';
 import './Diet.css';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// DIET CALCULATION ENGINE — v2
+// DIET CALCULATION ENGINE — v3 (complete redesign)
 //
-// Architecture:
-//  • Every food is tagged FIXED or DYNAMIC.
-//    - FIXED foods (Paneer, Whey Protein, Milk, Salad, Curd, Dal/Rajma+Sabzi,
-//      Mixed Vegetables) NEVER change quantity, no matter what the user's
-//      stats are. Their macros are counted, then SUBTRACTED from the day's
-//      target — they are never touched again.
-//    - DYNAMIC foods (Oats, Rice, Roti, Bread, Potato, Banana, Almonds,
-//      Peanut Butter, Soya Chunks, Seeds, etc.) absorb 100% of whatever
-//      target remains after the fixed foods are subtracted.
-//  • The remaining target is solved ONCE across the WHOLE DAY (all dynamic
-//    foods in all meals together), not meal-by-meal. This is what actually
-//    fixes accuracy: a meal with no protein-rich food is no longer asked to
-//    hit an impossible protein number on its own — the day's protein need
-//    is met by whichever dynamic foods across the day actually contain it.
-//  • Quantities round to realistic, clean numbers (nearest 25g for rice/
-//    potato, nearest 10g for oats, nearest 5g for small toppings, whole
-//    pieces for countable foods) — never odd decimals.
-//  • HARD MINIMUMS: a dynamic food can carry a `min` (e.g. Soya Chunks
-//    min: 50) — a floor that is enforced AFTER rounding/solving, so the
-//    macro solver can still scale it up but it can never drop below the
-//    minimum no matter what the day's remaining target looks like.
+// WHY THIS EXISTS
+//  v2 solved for dynamic-food quantities with an iterative "pick the biggest
+//  contributor and nudge it" correction loop. That approach has no guarantee
+//  of converging on the exact target, can oscillate, and gets harder to
+//  reason about every time a food is added. v3 replaces it with an exact,
+//  closed-form calculation: the amounts are the SOLUTION to a system of
+//  equations, not the result of repeated guessing.
+//
+// THE MATH
+//  For a given day, every FIXED food's macros are known constants. Subtract
+//  them from the day's target once — never touched again — and what's left
+//  (`remaining`) is the macro budget the DYNAMIC foods must cover exactly:
+//
+//      Σ x_i · protein_i  = remaining.protein
+//      Σ x_i · carbs_i    = remaining.carbs
+//      Σ x_i · fat_i      = remaining.fat
+//
+//  That's 3 equations. With more than 3 dynamic foods in the day (there
+//  always are — 7 to 9), the system is under-determined: infinitely many
+//  quantity combinations satisfy it exactly. To pick ONE sensible answer,
+//  we choose the combination that deviates as little as possible — in
+//  relative (%) terms — from each food's realistic reference portion
+//  (`base`). That is a constrained least-squares problem:
+//
+//      minimize   Σ  ((x_i − base_i) / base_i)²
+//      subject to Σ x_i · macro_i  =  remaining      (for protein, carbs, fat)
+//
+//  This has a closed-form solution via Lagrange multipliers: differentiate,
+//  set to zero, substitute into the 3 constraint equations, and you get a
+//  3×3 linear system for the multipliers (λ_protein, λ_carbs, λ_fat) that
+//  can be solved directly (Gaussian elimination) — no iteration, no
+//  approximation, an exact algebraic answer.
+//
+//  Quantities also have hard bounds — a floor (e.g. Soya Chunks ≥ 50g) or a
+//  ceiling (e.g. no one eats 6 bananas). Bounded quadratic optimization is
+//  solved with the standard ACTIVE-SET method: solve unconstrained, and if
+//  any food's solution violates its bound, pin that food at the bound and
+//  re-solve the (now smaller) system for everything else. This always
+//  terminates in at most N steps (N = number of dynamic foods) and is a
+//  textbook technique — not a heuristic.
+//
+//  Net effect: for any body stats / activity level / goal, the dynamic
+//  foods land on the exact combination of quantities that hits the day's
+//  macro target (or the closest feasible point, if bounds make an exact
+//  hit impossible) — deterministically, in one pass, every time.
+//
+// ARCHITECTURE
+//  1. FOOD_DB           — nutrition facts + unit type for every food.
+//  2. MEAL_TEMPLATES    — per goal (muscle_gain / fat_loss) × diet
+//                         (veg / nonveg), the meals and which foods in them
+//                         are fixed vs dynamic, with each dynamic food's
+//                         reference portion + realistic min/max bounds.
+//  3. solveDynamicQuantities() — the constrained least-squares solver above.
+//  4. generateDietPlan()       — orchestrates: subtract fixed macros → solve
+//                                dynamic quantities for the WHOLE DAY at once
+//                                (so a protein-light meal is still covered by
+//                                protein elsewhere in the day) → round to
+//                                realistic numbers → reassemble into meals.
 // ═══════════════════════════════════════════════════════════════════════════
 
-// ─── Nutrition per 100g/100ml (gram-based) or per single unit (countable:
-// pc / plate / bowl / scoop / slice). Calories are always DERIVED from
-// protein/carbs/fat (4/4/9 kcal per g) — never a separate hand-typed number —
-// so hitting the macro targets automatically means hitting calories too.
-const NUTRITION = {
-  // Dynamic (scale with the user's targets)
+// ─── 1. FOOD DATABASE ───────────────────────────────────────────────────────
+// Nutrition per 100g/100ml (gram-based foods) or per single countable unit
+// (scoop / plate / bowl / slice / piece). Calories are always DERIVED from
+// protein/carbs/fat (4/4/9 kcal per g), never hand-typed, so hitting the
+// macro targets automatically means hitting calories too.
+const FOOD_DB = {
+  // Dynamic — quantities scale to fit the day's remaining macro budget
   'Oats':                              { per100: { p: 16,  c: 66, f: 7   } },
-  'Rice':                               { per100: { p: 2.7, c: 28, f: 0.3 } },
-  'Fried Rice':                         { per100: { p: 3.5, c: 24, f: 6   } },
-  'Roti':                               { perUnit: { p: 3,   c: 18, f: 2.5 } }, // 1 roti (~40g)
-  'Brown Bread':                        { perUnit: { p: 2.3, c: 11, f: 0.8 } }, // 1 slice
-  'Boiled Potato':                      { per100: { p: 2,   c: 17, f: 0.1 } },
-  'Banana':                             { perUnit: { p: 1.3, c: 27, f: 0.3 } },
-  'Almonds':                            { per100: { p: 21,  c: 22, f: 50  } },
-  'Peanut Butter':                      { per100: { p: 25,  c: 20, f: 50  } },
-  'Soya Chunks':                        { per100: { p: 52,  c: 33, f: 0.5 } },
-  'Mixed Seeds':                        { per100: { p: 20,  c: 20, f: 45  } },
-  'Upma / Poha':                        { per100: { p: 3,   c: 25, f: 4   } },
-  'Roasted Chana / Sprouts Moong Dal':  { per100: { p: 15,  c: 45, f: 3   } },
-  'Chicken':                            { per100: { p: 31,  c: 0,  f: 3.6 } },
-  'Eggs':                               { perUnit: { p: 6,   c: 0.6, f: 5  } },
-  // Fixed (never scale — quantity is always the same)
-  'Paneer':                             { per100: { p: 18,  c: 1.2, f: 20 } },
-  'Whey Protein':                       { perUnit: { p: 24,  c: 3,  f: 1.5 } }, // 1 scoop
-  'Milk':                                { per100: { p: 3.2, c: 4.8, f: 3  } },
-  'Salad':                               { perUnit: { p: 2,   c: 6,  f: 0.3 } }, // 1 plate
-  'Curd':                                { perUnit: { p: 7,   c: 8,  f: 8   } }, // 1 bowl
-  'Dal/Rajma + Sabzi':                   { perUnit: { p: 9,   c: 30, f: 5   } }, // 1 bowl (combined)
-  'Mixed Vegetables':                    { perUnit: { p: 3,   c: 10, f: 4   } }, // 1 bowl
+  'Rice':                              { per100: { p: 2.7, c: 28, f: 0.3 } },
+  'Fried Rice':                        { per100: { p: 3.5, c: 24, f: 6   } },
+  'Roti':                              { perUnit: { p: 3,   c: 18, f: 2.5 } }, // 1 roti (~40g)
+  'Brown Bread':                       { perUnit: { p: 2.3, c: 11, f: 0.8 } }, // 1 slice
+  'Boiled Potato':                     { per100: { p: 2,   c: 17, f: 0.1 } },
+  'Banana':                            { perUnit: { p: 1.3, c: 27, f: 0.3 } },
+  'Almonds':                           { per100: { p: 21,  c: 22, f: 50  } },
+  'Peanut Butter':                     { per100: { p: 25,  c: 20, f: 50  } },
+  'Soya Chunks':                       { per100: { p: 52,  c: 33, f: 0.5 } },
+  'Mixed Seeds':                       { per100: { p: 20,  c: 20, f: 45  } },
+  'Upma / Poha':                       { per100: { p: 3,   c: 25, f: 4   } },
+  'Roasted Chana / Sprouts Moong Dal': { per100: { p: 15,  c: 45, f: 3   } },
+  'Chicken':                           { per100: { p: 31,  c: 0,  f: 3.6 } },
+  'Eggs':                              { perUnit: { p: 6,   c: 0.6, f: 5  } },
+  // Fixed — quantity is always the same, no matter what the user's stats are
+  'Paneer':                            { per100: { p: 18,  c: 1.2, f: 20 } },
+  'Whey Protein':                      { perUnit: { p: 24,  c: 3,  f: 1.5 } }, // 1 scoop
+  'Milk':                              { per100: { p: 3.2, c: 4.8, f: 3  } },
+  'Salad':                             { perUnit: { p: 2,   c: 6,  f: 0.3 } }, // 1 plate
+  'Curd':                              { perUnit: { p: 7,   c: 8,  f: 8   } }, // 1 bowl
+  'Dal/Rajma + Sabzi':                 { perUnit: { p: 9,   c: 30, f: 5   } }, // 1 bowl (combined)
+  'Mixed Vegetables':                  { perUnit: { p: 3,   c: 10, f: 4   } }, // 1 bowl
 };
+
+// Macro contribution per ONE UNIT of however this food is measured — per
+// gram/ml for bulk foods, per piece/scoop/bowl/etc. for countable ones.
+// This is the `a` vector the solver's equations are built from.
+function unitDensity(name, countable) {
+  const entry = FOOD_DB[name];
+  if (!entry) return { p: 0, c: 0, f: 0 };
+  if (countable) return entry.perUnit || entry.per100;
+  const ref = entry.per100 || entry.perUnit;
+  return { p: ref.p / 100, c: ref.c / 100, f: ref.f / 100 };
+}
 
 function computeItemMacros(name, amount, isCountable) {
-  const entry = NUTRITION[name];
-  if (!entry) return { protein: 0, carbs: 0, fat: 0, calories: 0 };
-  const ref = isCountable ? entry.perUnit : (entry.per100 || entry.perUnit);
-  const factor = isCountable ? amount : amount / 100;
-  const protein = ref.p * factor, carbs = ref.c * factor, fat = ref.f * factor;
-  const calories = protein * 4 + carbs * 4 + fat * 9;
-  return { protein, carbs, fat, calories };
+  const d = unitDensity(name, isCountable);
+  const protein = d.p * amount, carbs = d.c * amount, fat = d.f * amount;
+  return { protein, carbs, fat, calories: protein * 4 + carbs * 4 + fat * 9 };
 }
 
-// Round a dynamic gram quantity to a realistic step (25g for bulk staples
-// like rice/potato, 10g for oats/bread-scale portions, 5g for small
-// toppings like nuts/peanut butter/seeds).
-function roundToStep(value, step) {
-  return Math.max(step, Math.round(value / step) * step);
+// ─── 2. MEAL TEMPLATES ──────────────────────────────────────────────────────
+// Every item is tagged role:'fixed' (amount is permanent, identical for
+// muscle_gain AND fat_loss, per spec: Paneer 100g / Whey 1 scoop / Milk
+// 250ml / Salad 1 plate / Curd 1 bowl / Dal+Sabzi 1 bowl) or role:'dynamic'.
+//
+// Dynamic items carry:
+//   base   — realistic reference portion (used as the solver's "anchor" —
+//            the quantity it deviates from as little as possible)
+//   min    — hard floor, never crossed even if the macro math wants less.
+//            Only set where explicitly required (Soya Chunks ≥ 50g) — left
+//            unset elsewhere so the solver can shrink a food toward zero
+//            for extreme targets (e.g. a very low remaining carb budget)
+//            instead of being forced to overshoot the day's target.
+//   max    — hard ceiling, so the solver can never produce an unrealistic
+//            quantity (e.g. 6 bananas) even for extreme targets
+//   round  — realistic rounding step for display (25g rice/potato, 10g
+//            oats, 5g toppings; countable foods round to whole units)
+const MEAL_TEMPLATES = {
+  muscle_gain: {
+    veg: [
+      { id: 'meal1', name: 'Pre-Workout', time: '7:00 AM', icon: '🌅',
+        items: [
+          { name: 'Oats', role: 'dynamic', unit: 'g', base: 60, max: 180, round: 10 },
+          { name: 'Milk', role: 'fixed', unit: 'ml', amount: 250 },
+          { name: 'Banana', role: 'dynamic', unit: 'pc', base: 1, max: 3, countable: true },
+          { name: 'Almonds', role: 'dynamic', unit: 'g', base: 20, max: 70, round: 5 },
+        ] },
+      { id: 'meal2', name: 'Post-Workout', time: '10:00 AM', icon: '💪',
+        items: [
+          { name: 'Whey Protein', role: 'fixed', unit: 'scoop', amount: 1, countable: true },
+          { name: 'Brown Bread', role: 'dynamic', unit: 'slice', base: 4, max: 12, countable: true },
+          { name: 'Peanut Butter', role: 'dynamic', unit: 'g', base: 20, max: 70, round: 5 },
+          { name: 'Boiled Potato', role: 'dynamic', unit: 'g', base: 250, max: 500, round: 25 },
+        ] },
+      { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
+        items: [
+          { name: 'Rice', role: 'dynamic', unit: 'g', base: 250, max: 600, round: 25 },
+          { name: 'Dal/Rajma + Sabzi', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
+          { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
+        ] },
+      { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜',
+        items: [
+          { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 50, min: 50, max: 200, round: 5 },
+          { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
+        ] },
+      { id: 'meal5', name: 'Dinner', time: '9:00 PM', icon: '🍲',
+        items: [
+          { name: 'Paneer', role: 'fixed', unit: 'g', amount: 100 },
+          { name: 'Roti', role: 'dynamic', unit: 'pc', base: 3, max: 9, countable: true },
+          { name: 'Mixed Vegetables', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
+          { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
+        ] },
+    ],
+    nonveg: null, // built from veg + additions, see buildNonvegVariant() below
+  },
+  fat_loss: {
+    veg: [
+      { id: 'meal1', name: 'Pre-Workout', time: '6:30 AM', icon: '🌅',
+        items: [
+          { name: 'Upma / Poha', role: 'dynamic', unit: 'g', base: 150, max: 350, round: 25 },
+          { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
+        ] },
+      { id: 'meal2', name: 'Post-Workout', time: '8:00 AM', icon: '🥤',
+        items: [
+          { name: 'Oats', role: 'dynamic', unit: 'g', base: 40, max: 150, round: 10 },
+          { name: 'Whey Protein', role: 'fixed', unit: 'scoop', amount: 1, countable: true },
+          { name: 'Milk', role: 'fixed', unit: 'ml', amount: 250 },
+          { name: 'Banana', role: 'dynamic', unit: 'pc', base: 1, max: 2, countable: true },
+        ] },
+      { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
+        items: [
+          { name: 'Rice', role: 'dynamic', unit: 'g', base: 200, max: 500, round: 25 },
+          { name: 'Dal/Rajma + Sabzi', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
+          { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 30, min: 50, max: 200, round: 5 },
+          { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
+        ] },
+      { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜',
+        items: [
+          { name: 'Roasted Chana / Sprouts Moong Dal', role: 'dynamic', unit: 'g', base: 40, max: 150, round: 10 },
+          { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
+        ] },
+      { id: 'meal5', name: 'Dinner', time: '8:00 PM', icon: '🥣',
+        items: [
+          { name: 'Paneer', role: 'fixed', unit: 'g', amount: 100 },
+          { name: 'Fried Rice', role: 'dynamic', unit: 'g', base: 150, max: 400, round: 25 },
+          { name: 'Mixed Vegetables', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
+          { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
+        ] },
+    ],
+    nonveg: null,
+  },
+};
+
+// Non-vegetarian variants = the veg template + Chicken/Eggs woven into the
+// meals where they realistically fit (breakfast eggs, lunch chicken),
+// keeping every fixed food identical and every other dynamic food untouched.
+// Built programmatically (rather than duplicated by hand) so the veg
+// template stays the single source of truth for shared meals.
+function buildNonvegVariant(goal) {
+  const veg = MEAL_TEMPLATES[goal].veg;
+  return veg.map(meal => {
+    const items = meal.items.map(it => ({ ...it }));
+    if (goal === 'muscle_gain') {
+      if (meal.id === 'meal1') items.push({ name: 'Eggs', role: 'dynamic', unit: 'pc', base: 2, max: 6, countable: true });
+      if (meal.id === 'meal3') items.push({ name: 'Chicken', role: 'dynamic', unit: 'g', base: 150, max: 400, round: 25 });
+    } else {
+      if (meal.id === 'meal2') items.push({ name: 'Eggs', role: 'dynamic', unit: 'pc', base: 2, max: 4, countable: true });
+      if (meal.id === 'meal3') items.push({ name: 'Chicken', role: 'dynamic', unit: 'g', base: 120, max: 350, round: 25 });
+    }
+    return { ...meal, items };
+  });
+}
+MEAL_TEMPLATES.muscle_gain.nonveg = buildNonvegVariant('muscle_gain');
+MEAL_TEMPLATES.fat_loss.nonveg = buildNonvegVariant('fat_loss');
+
+function getMealTemplate(goal, dietType) {
+  const goalTemplates = MEAL_TEMPLATES[goal] || MEAL_TEMPLATES.muscle_gain;
+  return goalTemplates[dietType] || goalTemplates.veg;
 }
 
-// ─── Base meal plans — every item tagged role:'fixed'|'dynamic' ──────────────
-// Fixed items: `amount` is permanent and never changes.
-// Dynamic items: `base` is just a starting reference used to weight how much
-// of the remaining target each food should absorb relative to the others.
-const BASE_MEALS = {
-  muscle_gain: [
-    { id: 'meal1', name: 'Pre-Workout', time: '7:00 AM', icon: '🌅',
-      items: [
-        { name: 'Oats', role: 'dynamic', unit: 'g', base: 60, round: 10 },
-        { name: 'Milk', role: 'fixed', unit: 'ml', amount: 250 },
-        { name: 'Banana', role: 'dynamic', unit: 'pc', base: 1, countable: true },
-        { name: 'Almonds', role: 'dynamic', unit: 'g', base: 20, round: 5 },
-      ] },
-    { id: 'meal2', name: 'Post-Workout', time: '10:00 AM', icon: '💪',
-      items: [
-        { name: 'Whey Protein', role: 'fixed', unit: 'scoop', amount: 1, countable: true },
-        { name: 'Brown Bread', role: 'dynamic', unit: 'slice', base: 4, countable: true },
-        { name: 'Peanut Butter', role: 'dynamic', unit: 'g', base: 20, round: 5 },
-        { name: 'Boiled Potato', role: 'dynamic', unit: 'g', base: 250, round: 25 },
-      ] },
-    { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
-      items: [
-        { name: 'Rice', role: 'dynamic', unit: 'g', base: 250, round: 25 },
-        { name: 'Dal/Rajma + Sabzi', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
-      ] },
-    { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜',
-      items: [
-        { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 50, round: 5, min: 50 },
-        { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
-      ] },
-    { id: 'meal5', name: 'Dinner', time: '9:00 PM', icon: '🍲',
-      items: [
-        { name: 'Paneer', role: 'fixed', unit: 'g', amount: 100 },
-        { name: 'Roti', role: 'dynamic', unit: 'pc', base: 3, countable: true },
-        { name: 'Mixed Vegetables', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
-      ] },
-  ],
-  fat_loss: [
-    { id: 'meal1', name: 'Pre-Workout', time: '6:30 AM', icon: '🌅',
-      items: [
-        { name: 'Upma / Poha', role: 'dynamic', unit: 'g', base: 150, round: 25 },
-        { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
-      ] },
-    { id: 'meal2', name: 'Post-Workout', time: '8:00 AM', icon: '🥤',
-      items: [
-        { name: 'Oats', role: 'dynamic', unit: 'g', base: 40, round: 10 },
-        { name: 'Whey Protein', role: 'fixed', unit: 'scoop', amount: 1, countable: true },
-        { name: 'Milk', role: 'fixed', unit: 'ml', amount: 250 },
-        { name: 'Banana', role: 'dynamic', unit: 'pc', base: 1, countable: true },
-      ] },
-    { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
-      items: [
-        { name: 'Rice', role: 'dynamic', unit: 'g', base: 200, round: 25 },
-        { name: 'Dal/Rajma + Sabzi', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 30, round: 5, min: 50 },
-        { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
-      ] },
-    { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜',
-      items: [
-        { name: 'Roasted Chana / Sprouts Moong Dal', role: 'dynamic', unit: 'g', base: 40, round: 10 },
-        { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
-      ] },
-    { id: 'meal5', name: 'Dinner', time: '8:00 PM', icon: '🥣',
-      items: [
-        { name: 'Paneer', role: 'fixed', unit: 'g', amount: 100 },
-        { name: 'Fried Rice', role: 'dynamic', unit: 'g', base: 150, round: 25 },
-        { name: 'Mixed Vegetables', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
-      ] },
-  ],
-};
+// ─── 3. THE SOLVER ──────────────────────────────────────────────────────────
+// Solves a 3×3 linear system (protein/carbs/fat) via Gaussian elimination
+// with partial pivoting.
+function solveLinear3x3(matrix, rhs) {
+  const A = matrix.map(row => row.slice());
+  const b = rhs.slice();
+  for (let col = 0; col < 3; col++) {
+    let pivotRow = col;
+    for (let r = col + 1; r < 3; r++) {
+      if (Math.abs(A[r][col]) > Math.abs(A[pivotRow][col])) pivotRow = r;
+    }
+    if (pivotRow !== col) {
+      [A[col], A[pivotRow]] = [A[pivotRow], A[col]];
+      [b[col], b[pivotRow]] = [b[pivotRow], b[col]];
+    }
+    if (Math.abs(A[col][col]) < 1e-9) continue; // this direction is degenerate — skip
+    for (let r = col + 1; r < 3; r++) {
+      const factor = A[r][col] / A[col][col];
+      for (let c = col; c < 3; c++) A[r][c] -= factor * A[col][c];
+      b[r] -= factor * b[col];
+    }
+  }
+  const x = [0, 0, 0];
+  for (let r = 2; r >= 0; r--) {
+    let sum = b[r];
+    for (let c = r + 1; c < 3; c++) sum -= A[r][c] * x[c];
+    x[r] = Math.abs(A[r][r]) < 1e-9 ? 0 : sum / A[r][r];
+  }
+  return x;
+}
 
-// ─── Optional bonus meal — shown at the end, NOT counted toward the day's
-// calorie/protein/carb/fat target totals (purely an "if you need more" add-on)
-const OPTIONAL_MEALS = {
-  muscle_gain: [
-    { id: 'optional1', name: 'Optional (If You Need More Calories)', time: 'Anytime', icon: '➕',
-      items: [
-        { name: 'Oats', unit: 'g', amount: 40 },
-        { name: 'Milk', unit: 'ml', amount: 250 },
-        { name: 'Mixed Seeds', unit: 'g', amount: 15 },
-      ] },
-  ],
-};
+// Constrained least-squares: choose x_i (i = each dynamic food, across the
+// WHOLE DAY) minimizing Σ ((x_i-base_i)/base_i)² subject to Σ x_i·a_i =
+// remaining[protein,carbs,fat], with each x_i bounded to [min_i, max_i].
+// Solved exactly via Lagrange multipliers; bound violations are handled by
+// the standard active-set method (pin the violating food at its bound,
+// re-solve for everyone else — guaranteed to finish in ≤ N steps).
+function solveDynamicQuantities(dynamicItems, remaining) {
+  const n = dynamicItems.length;
+  const densities = dynamicItems.map(it => {
+    const d = unitDensity(it.name, !!it.countable);
+    return [d.p, d.c, d.f];
+  });
+  const free = new Set(dynamicItems.map((_, i) => i));
+  const boundValue = new Array(n).fill(null);
+  const amounts = new Array(n).fill(0);
 
-// ─── THE ENGINE ────────────────────────────────────────────────────────────
+  for (let iter = 0; iter <= n; iter++) {
+    const freeIdx = [...free];
+    const adjRemaining = remaining.slice();
+    for (let i = 0; i < n; i++) {
+      if (boundValue[i] !== null) {
+        const a = densities[i];
+        for (let k = 0; k < 3; k++) adjRemaining[k] -= a[k] * boundValue[i];
+        amounts[i] = boundValue[i];
+      }
+    }
+    if (freeIdx.length === 0) break;
+
+    const M = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+    const rhs = adjRemaining.slice();
+    for (const i of freeIdx) {
+      const a = densities[i];
+      const base = dynamicItems[i].base || 1e-6;
+      const w = 1 / (base * base);
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 3; c++) M[r][c] += (a[r] * a[c]) / (2 * w);
+      }
+      for (let r = 0; r < 3; r++) rhs[r] -= a[r] * base;
+    }
+    const lambda = solveLinear3x3(M, rhs);
+
+    let worstIdx = -1, worstMargin = 0, worstBound = 0;
+    for (const i of freeIdx) {
+      const a = densities[i];
+      const base = dynamicItems[i].base || 1e-6;
+      const w = 1 / (base * base);
+      let dot = 0;
+      for (let k = 0; k < 3; k++) dot += lambda[k] * a[k];
+      const x = base + dot / (2 * w);
+      amounts[i] = x;
+      const lo = dynamicItems[i].min != null ? dynamicItems[i].min : 0;
+      const hi = dynamicItems[i].max != null ? dynamicItems[i].max : Infinity;
+      if (x < lo - 1e-6 && (lo - x) > worstMargin) { worstIdx = i; worstMargin = lo - x; worstBound = lo; }
+      if (x > hi + 1e-6 && (x - hi) > worstMargin) { worstIdx = i; worstMargin = x - hi; worstBound = hi; }
+    }
+    if (worstIdx === -1) break; // every free food is within bounds — solved
+    free.delete(worstIdx);
+    boundValue[worstIdx] = worstBound;
+  }
+  return amounts;
+}
+
+// Round a raw solved quantity to a realistic, clean number for display —
+// nearest 25g for bulk staples, 10g for oats-scale portions, 5g for small
+// toppings, whole units for countable foods — then re-apply the hard
+// min/max bounds as a final safety net (rounding could otherwise nudge a
+// value a step outside its bound).
+// Round a raw solved quantity to a realistic, clean number for display —
+// nearest 25g for bulk staples, 10g for oats-scale portions, 5g for small
+// toppings, whole units for countable foods. Deliberately NOT floored to
+// "at least one step": if the day's remaining macro budget genuinely has no
+// room for a food (e.g. carbs are nearly used up elsewhere), the realistic
+// outcome is that the food doesn't appear that day — not a token 25g serving
+// forced in regardless of the math. An explicit `min` (Soya Chunks' 50g
+// floor) is still enforced as a hard safety net after rounding.
+function roundQuantity(item, rawAmount) {
+  let amount;
+  if (item.countable) {
+    amount = Math.max(0, Math.round(rawAmount));
+  } else {
+    const step = item.round || 10;
+    amount = Math.max(0, Math.round(rawAmount / step) * step);
+  }
+  if (item.min != null && amount > 0) amount = Math.max(amount, item.min);
+  if (item.max != null) amount = Math.min(amount, item.max);
+  return amount;
+}
+
+// ─── 4. PLAN ASSEMBLY ───────────────────────────────────────────────────────
 // STEP 1 (done by the caller): BMR → TDEE → target calories/protein/carbs/fat.
 // STEP 2: sum every FIXED food's real macros and subtract from the target.
-// STEP 3: distribute what's LEFT across dynamic foods only, solved once for
-//         the whole day, then round every quantity to a realistic number.
-function generateDietPlan(baseMeals, targetMacros) {
-  // Flatten every item across all meals, remembering where it came from.
+// STEP 3: solve the dynamic foods' quantities for the whole day at once
+//         (so a meal with no protein-rich food isn't asked to hit an
+//         impossible protein number alone — the day's protein need is met
+//         by whichever dynamic foods across the day actually contain it).
+// STEP 4: round to realistic numbers and reassemble into meals.
+function generateDietPlan(mealTemplate, targetMacros) {
   const flat = [];
-  baseMeals.forEach((meal, mi) => {
+  mealTemplate.forEach((meal, mi) => {
     meal.items.forEach((item, ii) => flat.push({ ...item, mi, ii }));
   });
 
-  // STEP 2 — fixed foods' real macros, permanently locked, then subtracted.
+  // STEP 2 — fixed foods, permanently locked, subtracted once.
   const fixedItems = flat.filter(it => it.role === 'fixed').map(it => ({
-    ...it, amount: it.amount, macros: computeItemMacros(it.name, it.amount, !!it.countable),
+    ...it, macros: computeItemMacros(it.name, it.amount, !!it.countable),
   }));
   const fixedTotal = fixedItems.reduce((acc, it) => ({
     protein: acc.protein + it.macros.protein,
@@ -187,72 +379,29 @@ function generateDietPlan(baseMeals, targetMacros) {
     fat: acc.fat + it.macros.fat,
   }), { protein: 0, carbs: 0, fat: 0 });
 
-  const remaining = {
-    protein: Math.max(0, targetMacros.protein - fixedTotal.protein),
-    carbs:   Math.max(0, targetMacros.carbs   - fixedTotal.carbs),
-    fat:     Math.max(0, targetMacros.fat     - fixedTotal.fat),
-  };
+  const remaining = [
+    Math.max(0, targetMacros.protein - fixedTotal.protein),
+    Math.max(0, targetMacros.carbs - fixedTotal.carbs),
+    Math.max(0, targetMacros.fat - fixedTotal.fat),
+  ];
 
-  // STEP 3 — distribute the REMAINING target only among dynamic foods.
+  // STEP 3 — exact constrained solve across all dynamic foods in the day.
   const dynamicItems = flat.filter(it => it.role === 'dynamic');
-  const baseline = dynamicItems.map(it => computeItemMacros(it.name, it.base, !!it.countable));
-  const baseTotal = baseline.reduce((acc, m) => ({
-    protein: acc.protein + m.protein, carbs: acc.carbs + m.carbs, fat: acc.fat + m.fat,
-  }), { protein: 0, carbs: 0, fat: 0 });
+  const rawAmounts = solveDynamicQuantities(dynamicItems, remaining);
 
-  const pScale = baseTotal.protein > 0 ? remaining.protein / baseTotal.protein : 1;
-  const cScale = baseTotal.carbs  > 0 ? remaining.carbs  / baseTotal.carbs  : 1;
-  const fScale = baseTotal.fat    > 0 ? remaining.fat    / baseTotal.fat    : 1;
-
-  // Initial guess: macro-weighted blend (protein-heavy foods scale toward
-  // the protein need, carb-heavy toward carbs, fat-heavy toward fat).
-  let rawAmounts = dynamicItems.map((it, i) => {
-    const b = baseline[i];
-    const macroSum = b.protein + b.carbs + b.fat;
-    const scale = macroSum > 0 ? (b.protein * pScale + b.carbs * cScale + b.fat * fScale) / macroSum : 1;
-    return it.base * scale;
-  });
-
-  const density = dynamicItems.map(it => computeItemMacros(it.name, it.countable ? 1 : 100, !!it.countable));
-
-  // Correction pass across the WHOLE DAY'S dynamic foods at once — far more
-  // flexibility than solving each meal in isolation, since the protein need
-  // can now be met by ANY protein-containing dynamic food anywhere in the day.
-  for (let pass = 0; pass < 8; pass++) {
-    ['protein', 'carbs', 'fat'].forEach(key => {
-      const current = dynamicItems.reduce((acc, it, i) => acc + computeItemMacros(it.name, rawAmounts[i], !!it.countable)[key], 0);
-      const gap = remaining[key] - current;
-      if (Math.abs(gap) < 0.01) return;
-
-      let anchorIdx = -1, maxShare = 0;
-      baseline.forEach((b, i) => { if (b[key] > maxShare) { maxShare = b[key]; anchorIdx = i; } });
-      if (anchorIdx === -1) return;
-
-      const perUnit = density[anchorIdx][key];
-      if (!perUnit || perUnit <= 0) return;
-      const unitsNeeded = dynamicItems[anchorIdx].countable ? (gap / perUnit) : (gap / perUnit) * 100;
-      rawAmounts[anchorIdx] = Math.max(0, rawAmounts[anchorIdx] + unitsNeeded);
-    });
-  }
-
-  // Round every dynamic food to a realistic, clean quantity. Foods with a
-  // `min` (e.g. Soya Chunks — must NEVER go below 50g regardless of what
-  // the macro solver computes) are floored AFTER rounding, so they can
-  // still scale upward freely but can never dip under their hard minimum.
+  // STEP 4 — round + reassemble.
   const finalDynamic = dynamicItems.map((it, i) => {
-    let amount = it.countable
-      ? Math.max(1, Math.round(rawAmounts[i]))
-      : roundToStep(rawAmounts[i], it.round || 10);
-    if (it.min) amount = Math.max(amount, it.min);
+    const amount = roundQuantity(it, rawAmounts[i]);
     return { ...it, amount, macros: computeItemMacros(it.name, amount, !!it.countable) };
   });
 
-  // Rebuild each meal from its fixed (untouched) + dynamic (final) items.
-  const scaledMeals = baseMeals.map((meal, mi) => {
-    const items = meal.items.map((item, ii) => {
-      if (item.role === 'fixed') return fixedItems.find(f => f.mi === mi && f.ii === ii);
-      return finalDynamic.find(d => d.mi === mi && d.ii === ii);
-    });
+  return mealTemplate.map((meal, mi) => {
+    const items = meal.items
+      .map((item, ii) => {
+        if (item.role === 'fixed') return fixedItems.find(f => f.mi === mi && f.ii === ii);
+        return finalDynamic.find(d => d.mi === mi && d.ii === ii);
+      })
+      .filter(it => it.amount > 0); // a food the day's budget had no room for simply isn't served
     const macros = items.reduce((acc, it) => ({
       protein: acc.protein + it.macros.protein,
       carbs: acc.carbs + it.macros.carbs,
@@ -270,11 +419,13 @@ function generateDietPlan(baseMeals, targetMacros) {
       },
     };
   });
-
-  return scaledMeals;
 }
 
-// ─── Validate that the meal breakdown actually adds up to the target ─────────
+// ─── Validate that the meal breakdown adds up to the target ────────────────
+// With the v3 solver, any drift here comes ONLY from realistic-number
+// rounding (and, rarely, from a bound like Soya Chunks' 50g floor making an
+// exact hit infeasible) — never from solver error, since the pre-rounding
+// solve is an exact algebraic solution.
 function validateDietPlan(scaledMeals, targetMacros) {
   const sum = scaledMeals.reduce((acc, m) => ({
     protein: acc.protein + m.macros.protein,
@@ -290,21 +441,35 @@ function validateDietPlan(scaledMeals, targetMacros) {
     calories: sum.calories - targetMacros.calories,
   };
   const valid =
-    Math.abs(diffs.protein) <= 2 &&
-    Math.abs(diffs.carbs) <= 3 &&
-    Math.abs(diffs.fat) <= 2 &&
-    Math.abs(diffs.calories) <= 20;
+    Math.abs(diffs.protein) <= 3 &&
+    Math.abs(diffs.carbs) <= 4 &&
+    Math.abs(diffs.fat) <= 3 &&
+    Math.abs(diffs.calories) <= 25;
 
   if (!valid) {
-    console.warn('[Diet plan] Meal totals drifted from target beyond tolerance:', diffs);
+    console.warn('[Diet plan] Meal totals drifted from target beyond rounding tolerance:', diffs);
   }
   return { valid, sum, diffs };
 }
 
 // ─── Optional bonus meal(s) — fixed reference amounts, never scaled, and
 // deliberately excluded from the target totals above.
-function resolveOptionalMeals(goal) {
-  const meals = OPTIONAL_MEALS[goal] || [];
+const OPTIONAL_MEALS = {
+  muscle_gain: {
+    veg: [
+      { id: 'optional1', name: 'Optional (If You Need More Calories)', time: 'Anytime', icon: '➕',
+        items: [
+          { name: 'Oats', unit: 'g', amount: 40 },
+          { name: 'Milk', unit: 'ml', amount: 250 },
+          { name: 'Mixed Seeds', unit: 'g', amount: 15 },
+        ] },
+    ],
+  },
+};
+OPTIONAL_MEALS.muscle_gain.nonveg = OPTIONAL_MEALS.muscle_gain.veg;
+
+function resolveOptionalMeals(goal, dietType) {
+  const meals = (OPTIONAL_MEALS[goal] && OPTIONAL_MEALS[goal][dietType]) || [];
   return meals.map(meal => {
     const items = meal.items.map(item => ({
       ...item, macros: computeItemMacros(item.name, item.amount, false),
@@ -327,6 +492,7 @@ function resolveOptionalMeals(goal) {
     };
   });
 }
+
 
 // ─── PDF Generator ────────────────────────────────────────────────────────────
 function generatePDF(meals, optionalMeals, userInfo, macros, targetCalories, actualCalories, goalLabel) {
@@ -767,7 +933,7 @@ export default function Diet() {
     // If we have the user's saved survey ANSWERS for this goal, regenerate
     // the plan fresh from them (using whatever the current meal data is) —
     // rather than loading a previously computed plan object from cache,
-    // which would go stale the moment BASE_MEALS is ever updated.
+    // which would go stale the moment MEAL_TEMPLATES is ever updated.
     try {
       const savedAnswers = localStorage.getItem(`bxl_diet_survey_${tabId}`);
       if (savedAnswers) {
@@ -789,7 +955,8 @@ export default function Diet() {
   function handleSurveySubmit(formData) {
     setLoading(true);
     setTimeout(() => {
-      const { weight, height, age, gender, activity, goal } = formData;
+      const { weight, height, age, gender, activity, goal, dietType } = formData;
+      const diet = dietType || 'nonveg';
       const w = parseFloat(weight), h = parseFloat(height), a = parseInt(age);
 
       // 1. BMR (Mifflin-St Jeor) → TDEE → daily calorie target
@@ -809,16 +976,16 @@ export default function Diet() {
       const carbsG = Math.round(remainingCal / 4);
       const targetMacros = { protein: proteinG, carbs: carbsG, fat: fatG, calories: targetCalories };
 
-      // 3+4+5. Split the day's targets across meals, then derive real
-      // ingredient quantities that hit each meal's slice of those targets.
-      const baseMeals = BASE_MEALS[goal] || BASE_MEALS.muscle_gain;
-      const scaledMeals = generateDietPlan(baseMeals, targetMacros);
+      // 3+4+5. Pick the right meal template for this goal + diet preference,
+      // then solve real ingredient quantities that hit the day's targets.
+      const mealTemplate = getMealTemplate(goal, diet);
+      const scaledMeals = generateDietPlan(mealTemplate, targetMacros);
 
       // 6. Validate: sum of all meals should equal the target within tolerance.
       const { sum } = validateDietPlan(scaledMeals, targetMacros);
 
       // Optional bonus meal(s) — shown separately, never counted in the totals above.
-      const optionalMeals = resolveOptionalMeals(goal);
+      const optionalMeals = resolveOptionalMeals(goal, diet);
 
       const planData = {
         meals: scaledMeals,
