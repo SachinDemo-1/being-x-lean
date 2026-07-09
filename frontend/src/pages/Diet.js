@@ -96,7 +96,7 @@ const BASE_MEALS = {
         { name: 'Whey Protein', role: 'fixed', unit: 'scoop', amount: 1, countable: true },
         { name: 'Brown Bread', role: 'dynamic', unit: 'slice', base: 4, countable: true },
         { name: 'Peanut Butter', role: 'dynamic', unit: 'g', base: 20, round: 5 },
-        { name: 'Boiled Potato', role: 'dynamic', unit: 'g', base: 250, round: 25 },
+        { name: 'Boiled Potato', role: 'fixed', unit: 'pc',amount: 2, countable: true},
       ] },
     { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
       items: [
