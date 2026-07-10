@@ -141,13 +141,13 @@ const BASE_MEALS = {
       ] },
     { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
       items: [
-        { name: 'Rice', role: 'dynamic', unit: 'g', base: 250, round: 25 },
+        { name: 'Rice', role: 'dynamic', unit: 'g', base: 250, round: 25 ,min: 200, max: 325 },
         { name: 'Dal/Rajma + Sabzi', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
         { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
       ] },
     { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜',
       items: [
-        { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 50, round: 5, min: 50 },
+        { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 50, round: 5, min: 30 , max: 50gm },
         { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
       ] },
     { id: 'meal5', name: 'Dinner', time: '9:00 PM', icon: '🍲',
