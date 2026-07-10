@@ -69,6 +69,8 @@ const NUTRITION = {
   'Curd':                              { perUnit: { p: 6.0, c: 7.0,  f: 4.5 } }, // 1 bowl (~150g)
   'Dal/Rajma + Sabzi':                 { perUnit: { p: 10.0,c: 28.0, f: 5.0 } }, // 1 bowl
   'Mixed Vegetables':                  { perUnit: { p: 3.0, c: 10.0, f: 3.0 } }, // 1 bowl
+  'Almonds':                           { per100: { p: 21.2, c: 21.7, f: 49.9 }, perUnit: { p: 0.25, c: 0.26, f: 0.60 } }, // 1 almond (~1.2g)
+  'Peanut Butter':                     { per100: { p: 25.0, c: 20.0, f: 50.0 }, perUnit: { p: 3.75, c: 3.0,  f: 7.5  } }, // 1 tbsp (~15g)
 };
 function computeItemMacros(name, amount, isCountable) {
   const entry = NUTRITION[name];
@@ -128,13 +130,13 @@ const BASE_MEALS = {
         { name: 'Oats', role: 'dynamic', unit: 'g', base: 60, round: 10 },
         { name: 'Milk', role: 'fixed', unit: 'ml', amount: 250 },
         { name: 'Banana', role: 'dynamic', unit: 'pc', base: 1, countable: true },
-        { name: 'Almonds', role: 'dynamic', unit: 'g', base: 20, round: 5 },
+        { name: 'Almonds', role: 'fixed', unit: 'pc', amount: 15, countable: true },
       ] },
     { id: 'meal2', name: 'Post-Workout', time: '10:00 AM', icon: '💪',
       items: [
         { name: 'Whey Protein', role: 'fixed', unit: 'scoop', amount: 1, countable: true },
-        { name: 'Brown Bread', role: 'dynamic', unit: 'slice', base: 4, countable: true },
-        { name: 'Peanut Butter', role: 'dynamic', unit: 'g', base: 20, round: 5 },
+        { name: 'Brown Bread', role: 'fixed', unit: 'slice', amount: 2, countable: true },
+        { name: 'Peanut Butter', role: 'fixed', unit: 'tbsp', amount: 1, countable: true },
         { name: 'Boiled Potato', role: 'fixed', unit: 'pc', amount: 2, countable: true },
       ] },
     { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
@@ -184,7 +186,7 @@ const BASE_MEALS = {
     { id: 'meal5', name: 'Dinner', time: '8:00 PM', icon: '🥣',
       items: [
         { name: 'Paneer', role: 'fixed', unit: 'g', amount: 100 },
-        { name: 'Fried Rice', role: 'dynamic', unit: 'g', base: 150, round: 25 },
+        { name: 'Fried Rice', role: 'dynamic', unit: 'g', base: 150, round: 25, max: 300 },
         { name: 'Mixed Vegetables', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
         { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
       ] },
@@ -285,6 +287,7 @@ function generateDietPlan(baseMeals, targetMacros) {
       ? Math.max(1, Math.round(rawAmounts[i]))
       : roundToStep(rawAmounts[i], it.round || 10);
     if (it.min) amount = Math.max(amount, it.min);
+    if (it.max) amount = Math.min(amount, it.max);
     return { ...it, amount, macros: computeItemMacros(it.name, amount, !!it.countable) };
   });
 
