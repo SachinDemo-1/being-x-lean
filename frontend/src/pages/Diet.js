@@ -188,9 +188,9 @@ function generateDietPlan(baseMeals, targetMacros) {
   }), { protein: 0, carbs: 0, fat: 0 });
 
   const remaining = {
-    protein: Math.max(0, targetMacros.protein - fixedTotal.protein),
-    carbs:   Math.max(0, targetMacros.carbs   - fixedTotal.carbs),
-    fat:     Math.max(0, targetMacros.fat     - fixedTotal.fat),
+    protein: Math.max(0, targetMacros.protein ),
+    carbs:   Math.max(0, targetMacros.carbs),
+    fat:     Math.max(0, targetMacros.fat),
   };
 
   // STEP 3 — distribute the REMAINING target only among dynamic foods.
