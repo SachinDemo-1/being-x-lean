@@ -166,7 +166,7 @@ const BASE_MEALS = {
       ] },
     { id: 'meal2', name: 'Post-Workout', time: '8:00 AM', icon: '🥤',
       items: [
-        { name: 'Oats', role: 'dynamic', unit: 'g', base: 40, round: 10 },
+        { name: 'Oats', role: 'dynamic', unit: 'g', base: 40, round: 10, min:25 , max: 60 },
         { name: 'Whey Protein', role: 'fixed', unit: 'scoop', amount: 1, countable: true },
         { name: 'Milk', role: 'fixed', unit: 'ml', amount: 250 },
         { name: 'Banana', role: 'dynamic', unit: 'pc', base: 1, countable: true },
