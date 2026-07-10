@@ -147,7 +147,7 @@ const BASE_MEALS = {
       ] },
     { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜',
       items: [
-        { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 50, round: 5, min: 30 , max: 50gm },
+        { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 50, round: 5, min: 30 , max: 50 },
         { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
       ] },
     { id: 'meal5', name: 'Dinner', time: '9:00 PM', icon: '🍲',
