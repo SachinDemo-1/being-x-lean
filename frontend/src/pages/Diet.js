@@ -49,7 +49,7 @@ const NUTRITION = {
   'Fried Rice':                        { per100: { p: 4.2,  c: 28.0, f: 5.5 } },
   'Roti':                              { perUnit: { p: 3.2, c: 18.0, f: 1.2 } }, // 1 medium (35-40g)
   'Brown Bread':                       { perUnit: { p: 3.5, c: 12.0, f: 1.1 } }, // 1 slice
-  'Boiled Potato':                     { per100: { p: 1.9,  c: 20.1, f: 0.1 } },
+  'Boiled Potato':                     { per100: { p: 1.9,  c: 20.1, f: 0.1 }, perUnit: { p: 2.85, c: 30.15, f: 0.15 } },
   'Banana':                            { perUnit: { p: 1.3, c: 27.0, f: 0.3 } }, // 1 medium
   'Almonds':                           { per100: { p: 21.2, c: 21.7, f: 49.9 } },
   'Peanut Butter':                     { per100: { p: 25.0, c: 20.0, f: 50.0 } },
@@ -135,7 +135,7 @@ const BASE_MEALS = {
         { name: 'Whey Protein', role: 'fixed', unit: 'scoop', amount: 1, countable: true },
         { name: 'Brown Bread', role: 'dynamic', unit: 'slice', base: 4, countable: true },
         { name: 'Peanut Butter', role: 'dynamic', unit: 'g', base: 20, round: 5 },
-        { name: 'Boiled Potato', role: 'dynamic', unit: 'g', base: 250, round: 25 },
+        { name: 'Boiled Potato', role: 'fixed', unit: 'pc', amount: 2, countable: true },
       ] },
     { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
       items: [
