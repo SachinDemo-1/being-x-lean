@@ -141,7 +141,7 @@ const BASE_MEALS = {
         { name: 'Whey Protein', role: 'fixed', unit: 'scoop', amount: 1, countable: true },
         { name: 'Brown Bread', role: 'fixed', unit: 'slice', amount: 2, countable: true },
         { name: 'Peanut Butter', role: 'fixed', unit: 'spoon', amount: 1, countable: true },
-        { name: 'Boiled Potato', role: 'fixed', unit: 'pc', amount: 2, countable: true },
+        { name: 'Boiled Potato', role: 'fixed', unit: 'pc', amount: 1, countable: true },
       ] },
     { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
       items: [
@@ -872,7 +872,7 @@ export default function Diet() {
       const proteinG = Math.round(w * 2);
       const fatG = Math.round(w * 1);
       const remainingCal = targetCalories - (proteinG * 4) - (fatG * 9);
-      const carbsG = Math.round(remainingCal / 4);
+      const carbsG = Math.round(remainingCal / 5);
       const targetMacros = { protein: proteinG, carbs: carbsG, fat: fatG, calories: targetCalories };
 
       // 3+4+5. Split the day's targets across meals, then derive real
