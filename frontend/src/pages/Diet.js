@@ -6,7 +6,7 @@ import { hasPlan } from '../context/purchases';
 import './Diet.css';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// DIET CALCULATION ENGINE — v2
+// DIET CALCULATION ENGINE — v3
 //
 // Architecture:
 //  • Every food is tagged FIXED or DYNAMIC.
@@ -29,6 +29,12 @@ import './Diet.css';
 //    min: 50) — a floor that is enforced AFTER rounding/solving, so the
 //    macro solver can still scale it up but it can never drop below the
 //    minimum no matter what the day's remaining target looks like.
+//  • EXACT TOTALS (NEW in v3): meal-level protein/carbs/fat/calories are no
+//    longer rounded independently per meal (which caused small drift vs. the
+//    target). Instead, each macro is apportioned across all meals at once
+//    using a largest-remainder method, so the meals' rounded totals ALWAYS
+//    sum to EXACTLY the day's target macros — with zero drift — while each
+//    meal still shows the closest realistic integer to its true value.
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ─── Nutrition per 100g/100ml (gram-based) or per single unit (countable:
@@ -79,6 +85,36 @@ function computeItemMacros(name, amount, isCountable) {
 // toppings like nuts/peanut butter/seeds).
 function roundToStep(value, step) {
   return Math.max(step, Math.round(value / step) * step);
+}
+
+// ─── Largest-remainder apportionment ──────────────────────────────────────
+// Rounds an array of real (float) values to integers so that they sum to
+// EXACTLY `total`, while keeping each value as close as possible to its
+// true amount. This is what guarantees meal totals always add up to the
+// target macros with zero drift, instead of each meal rounding on its own.
+function distributeIntegerWithRemainder(total, realValues) {
+  const floors = realValues.map(v => Math.floor(Math.max(0, v)));
+  let allocated = floors.reduce((a, b) => a + b, 0);
+  let remainder = total - allocated;
+  const result = [...floors];
+
+  if (remainder > 0) {
+    // Give the leftover +1s to whichever meals had the largest fractional part.
+    const order = realValues
+      .map((v, i) => ({ i, frac: v - floors[i] }))
+      .sort((a, b) => b.frac - a.frac);
+    for (let k = 0; k < remainder; k++) result[order[k % order.length].i] += 1;
+  } else if (remainder < 0) {
+    // Real sum overshot the target (rare) — trim from smallest fractional parts first.
+    const order = realValues
+      .map((v, i) => ({ i, frac: v - floors[i] }))
+      .sort((a, b) => a.frac - b.frac);
+    for (let k = 0; k < Math.abs(remainder); k++) {
+      const idx = order[k % order.length].i;
+      result[idx] = Math.max(0, result[idx] - 1);
+    }
+  }
+  return result;
 }
 
 // ─── Base meal plans — every item tagged role:'fixed'|'dynamic' ──────────────
@@ -173,6 +209,8 @@ const OPTIONAL_MEALS = {
 // STEP 2: sum every FIXED food's real macros and subtract from the target.
 // STEP 3: distribute what's LEFT across dynamic foods only, solved once for
 //         the whole day, then round every quantity to a realistic number.
+// STEP 4: apportion each macro's rounded meal totals so they sum EXACTLY to
+//         targetMacros (largest-remainder method) — no drift, ever.
 function generateDietPlan(baseMeals, targetMacros) {
   // Flatten every item across all meals, remembering where it came from.
   const flat = [];
@@ -250,34 +288,46 @@ function generateDietPlan(baseMeals, targetMacros) {
     return { ...it, amount, macros: computeItemMacros(it.name, amount, !!it.countable) };
   });
 
-  // Rebuild each meal from its fixed (untouched) + dynamic (final) items.
-  const scaledMeals = baseMeals.map((meal, mi) => {
+  // Rebuild each meal from its fixed (untouched) + dynamic (final) items,
+  // keeping REAL (unrounded) macros for now — rounding happens next, across
+  // all meals together, so the totals land exactly on target.
+  const mealsWithItems = baseMeals.map((meal, mi) => {
     const items = meal.items.map((item, ii) => {
       if (item.role === 'fixed') return fixedItems.find(f => f.mi === mi && f.ii === ii);
       return finalDynamic.find(d => d.mi === mi && d.ii === ii);
     });
-    const macros = items.reduce((acc, it) => ({
+    const realMacros = items.reduce((acc, it) => ({
       protein: acc.protein + it.macros.protein,
       carbs: acc.carbs + it.macros.carbs,
       fat: acc.fat + it.macros.fat,
       calories: acc.calories + it.macros.calories,
     }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
-    return {
-      ...meal,
-      items,
-      macros: {
-        protein: Math.round(macros.protein),
-        carbs: Math.round(macros.carbs),
-        fat: Math.round(macros.fat),
-        calories: Math.round(macros.calories),
-      },
-    };
+    return { ...meal, items, realMacros };
   });
+
+  // STEP 4 — apportion each macro across meals so the rounded, DISPLAYED
+  // numbers sum to EXACTLY targetMacros — no drift, regardless of rounding.
+  const proteinAlloc  = distributeIntegerWithRemainder(targetMacros.protein,  mealsWithItems.map(m => m.realMacros.protein));
+  const carbsAlloc    = distributeIntegerWithRemainder(targetMacros.carbs,    mealsWithItems.map(m => m.realMacros.carbs));
+  const fatAlloc      = distributeIntegerWithRemainder(targetMacros.fat,      mealsWithItems.map(m => m.realMacros.fat));
+  const caloriesAlloc = distributeIntegerWithRemainder(targetMacros.calories, mealsWithItems.map(m => m.realMacros.calories));
+
+  const scaledMeals = mealsWithItems.map((meal, mi) => ({
+    ...meal,
+    macros: {
+      protein: proteinAlloc[mi],
+      carbs: carbsAlloc[mi],
+      fat: fatAlloc[mi],
+      calories: caloriesAlloc[mi],
+    },
+  }));
 
   return scaledMeals;
 }
 
 // ─── Validate that the meal breakdown actually adds up to the target ─────────
+// (Now mostly a safety net — with the largest-remainder apportionment above,
+// diffs should always be exactly 0 for protein/carbs/fat/calories.)
 function validateDietPlan(scaledMeals, targetMacros) {
   const sum = scaledMeals.reduce((acc, m) => ({
     protein: acc.protein + m.macros.protein,
@@ -293,13 +343,13 @@ function validateDietPlan(scaledMeals, targetMacros) {
     calories: sum.calories - targetMacros.calories,
   };
   const valid =
-    Math.abs(diffs.protein) <= 2 &&
-    Math.abs(diffs.carbs) <= 3 &&
-    Math.abs(diffs.fat) <= 2 &&
-    Math.abs(diffs.calories) <= 20;
+    diffs.protein === 0 &&
+    diffs.carbs === 0 &&
+    diffs.fat === 0 &&
+    diffs.calories === 0;
 
   if (!valid) {
-    console.warn('[Diet plan] Meal totals drifted from target beyond tolerance:', diffs);
+    console.warn('[Diet plan] Meal totals drifted from target:', diffs);
   }
   return { valid, sum, diffs };
 }
@@ -817,7 +867,7 @@ export default function Diet() {
       const baseMeals = BASE_MEALS[goal] || BASE_MEALS.muscle_gain;
       const scaledMeals = generateDietPlan(baseMeals, targetMacros);
 
-      // 6. Validate: sum of all meals should equal the target within tolerance.
+      // 6. Validate: sum of all meals should equal the target exactly.
       const { sum } = validateDietPlan(scaledMeals, targetMacros);
 
       // Optional bonus meal(s) — shown separately, never counted in the totals above.
