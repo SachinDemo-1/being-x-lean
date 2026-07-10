@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { hasPlan } from '../context/purchases';
-import { generateMealPlan } from '../utils/dietEngine';
+import { generateMealPlan } from '../utils/dietEngine.js';
 import './Diet.css';
 
 // ─── Meal generation ──────────────────────────────────────────────────────────
