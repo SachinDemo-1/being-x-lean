@@ -165,7 +165,7 @@ const BASE_MEALS = {
   fat_loss: [
     { id: 'meal1', name: 'Pre-Workout', time: '6:30 AM', icon: '🌅',
       items: [
-        { name: 'Upma / Poha', role: 'dynamic', unit: 'g', base: 150, round: 25 },
+        { name: 'Upma / Poha', role: 'dynamic', unit: 'g', base: 150, round: 25 , max:200},
         { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
       ] },
     { id: 'meal2', name: 'Post-Workout', time: '8:00 AM', icon: '🥤',
@@ -179,7 +179,7 @@ const BASE_MEALS = {
       items: [
         { name: 'Rice', role: 'dynamic', unit: 'g', base: 200, round: 25 , min: 200 },
         { name: 'Dal/Rajma + Sabzi', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 30, round: 5, min: 50 },
+        { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 30, round: 5, min: 30 , max:40 },
         { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
       ] },
     { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜',
@@ -190,7 +190,7 @@ const BASE_MEALS = {
     { id: 'meal5', name: 'Dinner', time: '8:00 PM', icon: '🥣',
       items: [
         { name: 'Paneer', role: 'fixed', unit: 'g', amount: 100 },
-        { name: 'Fried Rice', role: 'dynamic', unit: 'g', base: 150, round: 10 ,min:200, max: 300 },
+        { name: 'Rice/Roti', role: 'fixed', unit: 'Pc', amont: 3},
         { name: 'Mixed Vegetables', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
         { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
       ] },
