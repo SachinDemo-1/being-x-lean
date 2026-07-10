@@ -412,6 +412,20 @@ function generatePDF(meals, optionalMeals, userInfo, macros, targetCalories, act
   // Cover
   doc.setFillColor(...dark); doc.rect(0, 0, W, 297, 'F');
   doc.setFillColor(...gold); doc.rect(0, 0, W, 3, 'F'); doc.rect(margin, 45, 1.5, 55, 'F');
+  // FRONT PAGE BODY IMAGE ONLY
+  const bodyImg = new Image();
+  bodyImg.src = "/images/body.png";
+
+  doc.addImage(
+    bodyImg,
+    "PNG",
+
+    110, // left-right position
+    45,  // up-down position
+
+    80,  // width
+    105  // height
+  );
   doc.setTextColor(...gold); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
   doc.text('BEING X LEAN', margin + 6, 30);
   doc.setTextColor(...gray); doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
