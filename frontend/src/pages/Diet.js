@@ -827,9 +827,9 @@ export default function Diet() {
         meals: scaledMeals,
         optionalMeals,
         userInfo: formData,
-        macros: { protein: sum.protein, carbs: sum.carbs, fat: sum.fat },
+        macros: { protein: targetMacros.protein, carbs: targetMacros.carbs, fat: targetMacros.fat },
         targetCalories,
-        actualCalories: sum.calories,
+        actualCalories: targetMacros.calories,
         tdee,
       };
       setPlanResult(planData);
