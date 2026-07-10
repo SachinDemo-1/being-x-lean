@@ -145,7 +145,7 @@ const BASE_MEALS = {
       ] },
     { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
       items: [
-        { name: 'Rice', role: 'dynamic', unit: 'g', base: 25, round: 25 ,min: 200, max: 325 },
+        { name: 'Rice/Roti', role: 'dynamic', unit: 'g', base: 25, round: 25 ,min: 200, max: 325 },
         { name: 'Dal/Rajma + Sabzi', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
         { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
       ] },
@@ -156,7 +156,7 @@ const BASE_MEALS = {
       ] },
     { id: 'meal5', name: 'Dinner', time: '9:00 PM', icon: '🍲',
       items: [
-        { name: 'Paneer', role: 'fixed', unit: 'g', amount: 150 },
+        { name: 'Paneer/Tofu', role: 'fixed', unit: 'g', amount: 150 },
         { name: 'Roti', role: 'dynamic', unit: 'pc', base: 3, countable: true , min: 3, max:4 },
         { name: 'Mixed Vegetables', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
         { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
@@ -177,7 +177,7 @@ const BASE_MEALS = {
       ] },
     { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
       items: [
-        { name: 'Rice', role: 'dynamic', unit: 'g', base: 200, round: 25 , min: 200 },
+        { name: 'Rice/Roti', role: 'dynamic', unit: 'g', base: 200, round: 25 , min: 200 },
         { name: 'Dal/Rajma + Sabzi', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
         { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 30, round: 5, min: 30 , max:40 },
         { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
@@ -189,7 +189,7 @@ const BASE_MEALS = {
       ] },
     { id: 'meal5', name: 'Dinner', time: '8:00 PM', icon: '🥣',
       items: [
-        { name: 'Paneer', role: 'fixed', unit: 'g', amount: 100 },
+        { name: 'Paneer/Tofu', role: 'fixed', unit: 'g', amount: 100 },
         { name: 'Rice/Roti', role: 'fixed', unit: 'Pc', amount: 3},
         { name: 'Mixed Vegetables', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
         { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
