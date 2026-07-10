@@ -421,9 +421,9 @@ function generatePDF(meals, optionalMeals, userInfo, macros, targetCalories, act
     "PNG",
 
     110, // left-right position
-    45,  // up-down position
+    25,  // up-down position
 
-    80,  // width
+    100,  // width
     105  // height
   );
   doc.setTextColor(...gold); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
