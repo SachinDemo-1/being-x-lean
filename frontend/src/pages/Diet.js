@@ -260,7 +260,7 @@ function generateDietPlan(baseMeals, targetMacros) {
     };
   });
   // FINAL FIX AFTER ROUNDING
-  for(let pass = 0; pass < 5; pass++){
+  for(let pass = 0; pass < 15; pass++){
 
     const current = finalDynamic.reduce(
       (acc,it)=>({
@@ -296,6 +296,11 @@ function generateDietPlan(baseMeals, targetMacros) {
       finalDynamic.forEach((food,i)=>{
 
         let value = food.macros[key];
+
+
+        // ignore minimum locked foods
+        if(food.min) return;
+
 
         if(value > max){
 
