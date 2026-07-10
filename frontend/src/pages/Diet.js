@@ -260,23 +260,26 @@ function generateDietPlan(baseMeals, targetMacros) {
     };
   });
   // FINAL FIX AFTER ROUNDING
-  // FINAL FIX AFTER ROUNDING
-  for (let pass = 0; pass < 15; pass++) {
+  for(let pass = 0; pass < 5; pass++){
 
     const current = finalDynamic.reduce(
-      (acc, food) => ({
-        protein: acc.protein + food.macros.protein,
-        carbs: acc.carbs + food.macros.carbs,
-        fat: acc.fat + food.macros.fat
+      (acc,it)=>({
+        protein: acc.protein + it.macros.protein,
+        carbs: acc.carbs + it.macros.carbs,
+        fat: acc.fat + it.macros.fat
       }),
-      { protein:0, carbs:0, fat:0 }
+      {protein:0, carbs:0, fat:0}
     );
 
 
     const gaps = {
-      protein: remaining.protein - current.protein,
-      carbs: remaining.carbs - current.carbs,
-      fat: remaining.fat - current.fat
+
+      protein: remaining.protein-current.protein,
+
+      carbs: remaining.carbs-current.carbs,
+
+      fat: remaining.fat-current.fat
+
     };
 
 
@@ -292,14 +295,11 @@ function generateDietPlan(baseMeals, targetMacros) {
 
       finalDynamic.forEach((food,i)=>{
 
+        let value = food.macros[key];
 
-        // don't reduce locked foods
-        if(food.min && gaps[key] < 0) return;
+        if(value > max){
 
-
-        if(food.macros[key] > max){
-
-          max = food.macros[key];
+          max = value;
 
           index = i;
 
@@ -314,43 +314,30 @@ function generateDietPlan(baseMeals, targetMacros) {
       const food = finalDynamic[index];
 
 
-      const perUnit = computeItemMacros(
-        food.name,
-        food.countable ? 1 : 100,
-        !!food.countable
-      )[key];
+      const densityMacro =
+        computeItemMacros(
+          food.name,
+          food.countable ? 1 : 100,
+          !!food.countable
+        )[key];
 
 
-      if(!perUnit) return;
+      if(!densityMacro) return;
 
 
-      let change = food.countable
-        ? gaps[key] / perUnit
-        : (gaps[key] / perUnit) * 100;
-
+      const change = food.countable
+        ? gaps[key]/densityMacro
+        : (gaps[key]/densityMacro)*100;
 
 
       let newAmount = food.amount + change;
 
 
-
-      // ******** IMPORTANT FIX ********
-
-      if(food.countable){
-
+      if(food.min){
         newAmount = Math.max(
-          1,
-          Math.round(newAmount)
+            newAmount,
+            food.min
         );
-
-      }
-      else{
-
-        newAmount = Math.max(
-          food.min || 0,
-          newAmount
-        );
-
       }
 
 
@@ -361,17 +348,18 @@ function generateDietPlan(baseMeals, targetMacros) {
         amount:newAmount,
 
         macros:computeItemMacros(
-          food.name,
-          newAmount,
-          !!food.countable
+            food.name,
+            newAmount,
+            !!food.countable
         )
 
       };
 
-
     });
 
   }
+
+
   // Rebuild each meal from its fixed (untouched) + dynamic (final) items.
   const scaledMeals = baseMeals.map((meal, mi) => {
     const items = meal.items.map((item, ii) => {
