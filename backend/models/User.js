@@ -8,7 +8,7 @@ const userSchema = new mongoose.Schema({
   // email === undefined without triggering a duplicate-key error
   // (this was previously crashing the 2nd+ phone-only registration).
   email: { type: String, unique: true, sparse: true, lowercase: true },
-  phone: { type: String, unique: true, sparse: true, default: null },
+  phone: { type: String, unique: true, sparse: true},
   password: { type: String },
   googleId: { type: String },
   facebookId: { type: String },
