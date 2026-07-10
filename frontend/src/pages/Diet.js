@@ -420,11 +420,11 @@ function generatePDF(meals, optionalMeals, userInfo, macros, targetCalories, act
     bodyImg,
     "PNG",
 
-    110, // left-right position
-    25,  // up-down position
+    90, // left-right position
+    20,  // up-down position
 
     100,  // width
-    105  // height
+    100  // height
   );
   doc.setTextColor(...gold); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
   doc.text('BEING X LEAN', margin + 6, 30);
