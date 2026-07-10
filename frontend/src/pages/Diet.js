@@ -173,7 +173,7 @@ const BASE_MEALS = {
       ] },
     { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
       items: [
-        { name: 'Rice', role: 'dynamic', unit: 'g', base: 200, round: 25 },
+        { name: 'Rice', role: 'dynamic', unit: 'g', base: 200, round: 25 , min: 200 },
         { name: 'Dal/Rajma + Sabzi', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
         { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 30, round: 5, min: 50 },
         { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
