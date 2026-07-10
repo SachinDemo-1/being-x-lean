@@ -37,31 +37,33 @@ import './Diet.css';
 // so hitting the macro targets automatically means hitting calories too.
 const NUTRITION = {
   // Dynamic (scale with the user's targets)
-  'Oats':                              { per100: { p: 16,  c: 66, f: 7   } },
-  'Rice':                               { per100: { p: 2.7, c: 28, f: 0.3 } },
-  'Fried Rice':                         { per100: { p: 3.5, c: 24, f: 6   } },
-  'Roti':                               { perUnit: { p: 3,   c: 18, f: 2.5 } }, // 1 roti (~40g)
-  'Brown Bread':                        { perUnit: { p: 2.3, c: 11, f: 0.8 } }, // 1 slice
-  'Boiled Potato':                      { per100: { p: 2,   c: 17, f: 0.1 } },
-  'Banana':                             { perUnit: { p: 1.3, c: 27, f: 0.3 } },
-  'Almonds':                            { per100: { p: 21,  c: 22, f: 50  } },
-  'Peanut Butter':                      { per100: { p: 25,  c: 20, f: 50  } },
-  'Soya Chunks':                        { per100: { p: 52,  c: 33, f: 0.5 } },
-  'Mixed Seeds':                        { per100: { p: 20,  c: 20, f: 45  } },
-  'Upma / Poha':                        { per100: { p: 3,   c: 25, f: 4   } },
-  'Roasted Chana / Sprouts Moong Dal':  { per100: { p: 15,  c: 45, f: 3   } },
-  'Chicken':                            { per100: { p: 31,  c: 0,  f: 3.6 } },
-  'Eggs':                               { perUnit: { p: 6,   c: 0.6, f: 5  } },
-  // Fixed (never scale — quantity is always the same)
-  'Paneer':                             { per100: { p: 18,  c: 1.2, f: 20 } },
-  'Whey Protein':                       { perUnit: { p: 24,  c: 3,  f: 1.5 } }, // 1 scoop
-  'Milk':                                { per100: { p: 3.2, c: 4.8, f: 3  } },
-  'Salad':                               { perUnit: { p: 2,   c: 6,  f: 0.3 } }, // 1 plate
-  'Curd':                                { perUnit: { p: 7,   c: 8,  f: 8   } }, // 1 bowl
-  'Dal/Rajma + Sabzi':                   { perUnit: { p: 9,   c: 30, f: 5   } }, // 1 bowl (combined)
-  'Mixed Vegetables':                    { perUnit: { p: 3,   c: 10, f: 4   } }, // 1 bowl
-};
 
+  'Oats':                              { per100: { p: 16.9, c: 66.3, f: 6.9 } }, // Raw
+  'Rice':                              { per100: { p: 2.7,  c: 28.2, f: 0.3 } }, // Cooked White Rice
+  'Fried Rice':                        { per100: { p: 4.2,  c: 28.0, f: 5.5 } },
+  'Roti':                              { perUnit: { p: 3.2, c: 18.0, f: 1.2 } }, // 1 medium (35-40g)
+  'Brown Bread':                       { perUnit: { p: 3.5, c: 12.0, f: 1.1 } }, // 1 slice
+  'Boiled Potato':                     { per100: { p: 1.9,  c: 20.1, f: 0.1 } },
+  'Banana':                            { perUnit: { p: 1.3, c: 27.0, f: 0.3 } }, // 1 medium
+  'Almonds':                           { per100: { p: 21.2, c: 21.7, f: 49.9 } },
+  'Peanut Butter':                     { per100: { p: 25.0, c: 20.0, f: 50.0 } },
+  'Soya Chunks':                       { per100: { p: 52.0, c: 33.0, f: 0.5 } }, // Dry
+  'Mixed Seeds':                       { per100: { p: 22.0, c: 18.0, f: 49.0 } },
+  'Upma / Poha':                       { per100: { p: 3.2,  c: 24.0, f: 4.2 } },
+  'Roasted Chana / Sprouts Moong Dal': { per100: { p: 20.0, c: 55.0, f: 5.0 } },
+  'Chicken':                           { per100: { p: 31.0, c: 0.0,  f: 3.6 } }, // Cooked Chicken Breast
+  'Eggs':                              { perUnit: { p: 6.3, c: 0.4,  f: 5.3 } }, // 1 large egg
+
+  // Fixed (never scale — quantity is always the same)
+
+  'Paneer':                            { per100: { p: 18.3, c: 1.2,  f: 20.8 } },
+  'Whey Protein':                      { perUnit: { p: 24.0, c: 3.0,  f: 1.5 } }, // 1 scoop (30g)
+  'Milk':                              { per100: { p: 3.3,  c: 4.8,  f: 3.3 } }, // Toned Milk
+  'Salad':                             { perUnit: { p: 2.0, c: 6.0,  f: 0.3 } }, // 1 plate
+  'Curd':                              { perUnit: { p: 6.0, c: 7.0,  f: 4.5 } }, // 1 bowl (~150g)
+  'Dal/Rajma + Sabzi':                 { perUnit: { p: 10.0,c: 28.0, f: 5.0 } }, // 1 bowl
+  'Mixed Vegetables':                  { perUnit: { p: 3.0, c: 10.0, f: 3.0 } }, // 1 bowl
+};
 function computeItemMacros(name, amount, isCountable) {
   const entry = NUTRITION[name];
   if (!entry) return { protein: 0, carbs: 0, fat: 0, calories: 0 };
@@ -797,7 +799,7 @@ export default function Diet() {
       const bmr = gender === 'male' ? (10*w + 6.25*h - 5*a + 5) : (10*w + 6.25*h - 5*a - 161);
       const actMult = { sedentary:1.2, light:1.375, moderate:1.55, active:1.725, very_active:1.9 };
       const tdee = Math.round(bmr * (actMult[activity] || 1.55));
-      const MUSCLE_GAIN_SURPLUS = 0; // midpoint of the 300–500 kcal range
+      const MUSCLE_GAIN_SURPLUS = 400; // midpoint of the 300–500 kcal range
       const FAT_LOSS_DEFICIT = 500;
       const targetCalories = goal === 'fat_loss' ? tdee - FAT_LOSS_DEFICIT : tdee + MUSCLE_GAIN_SURPLUS;
 
@@ -806,7 +808,7 @@ export default function Diet() {
       //    protein*4 + fat*9 + carbs*4 === targetCalories, exactly.
       const proteinG = Math.round(w * 2);
       const fatG = Math.round(w * 1);
-      const remainingCal = targetCalories - (proteinG * 9) - (fatG * 9);
+      const remainingCal = targetCalories - (proteinG * 4) - (fatG * 9);
       const carbsG = Math.round(remainingCal / 4);
       const targetMacros = { protein: proteinG, carbs: carbsG, fat: fatG, calories: targetCalories };
 
