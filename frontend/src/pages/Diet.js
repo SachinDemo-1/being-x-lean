@@ -170,206 +170,70 @@ const OPTIONAL_MEALS = {
 // STEP 2: sum every FIXED food's real macros and subtract from the target.
 // STEP 3: distribute what's LEFT across dynamic foods only, solved once for
 //         the whole day, then round every quantity to a realistic number.
-// Subtract the macros contributed by any `min`-locked dynamic food from the
-// remaining target BEFORE the solver runs, so the solver knows those grams
-// are already spoken for and doesn't double-count them.
-  function applyMinsToRemaining(dynamicItems, remaining) {
-    const lockedMacros = { protein: 0, carbs: 0, fat: 0 };
-    const lockedAmounts = dynamicItems.map(it => {
-      if (!it.min) return 0;
-      const m = computeItemMacros(it.name, it.min, !!it.countable);
-      lockedMacros.protein += m.protein;
-      lockedMacros.carbs   += m.carbs;
-      lockedMacros.fat     += m.fat;
-      return it.min;
-    });
-    return {
-      lockedAmounts,
-      remainingAfterMins: {
-        protein: Math.max(0, remaining.protein - lockedMacros.protein),
-        carbs:   Math.max(0, remaining.carbs   - lockedMacros.carbs),
-        fat:     Math.max(0, remaining.fat     - lockedMacros.fat),
-      },
-    };
-  }
+function generateDietPlan(baseMeals, targetMacros) {
+  // Flatten every item across all meals, remembering where it came from.
+  const flat = [];
+  baseMeals.forEach((meal, mi) => {
+    meal.items.forEach((item, ii) => flat.push({ ...item, mi, ii }));
+  });
 
-  function generateDietPlan(baseMeals, targetMacros) {
-    const flat = [];
-    baseMeals.forEach((meal, mi) => {
-      meal.items.forEach((item, ii) => flat.push({ ...item, mi, ii }));
-    });
+  // STEP 2 — fixed foods' real macros, permanently locked, then subtracted.
+  const fixedItems = flat.filter(it => it.role === 'fixed').map(it => ({
+    ...it, amount: it.amount, macros: computeItemMacros(it.name, it.amount, !!it.countable),
+  }));
+  const fixedTotal = fixedItems.reduce((acc, it) => ({
+    protein: acc.protein + it.macros.protein,
+    carbs: acc.carbs + it.macros.carbs,
+    fat: acc.fat + it.macros.fat,
+  }), { protein: 0, carbs: 0, fat: 0 });
 
-    // STEP 2 — fixed foods locked & subtracted.
-    const fixedItems = flat.filter(it => it.role === 'fixed').map(it => ({
-      ...it, amount: it.amount, macros: computeItemMacros(it.name, it.amount, !!it.countable),
-    }));
-    const fixedTotal = fixedItems.reduce((a, it) => ({
-      protein: a.protein + it.macros.protein,
-      carbs:   a.carbs   + it.macros.carbs,
-      fat:     a.fat     + it.macros.fat,
-    }), { protein: 0, carbs: 0, fat: 0 });
+  const remaining = {
+    protein: Math.max(0, targetMacros.protein - fixedTotal.protein),
+    carbs:   Math.max(0, targetMacros.carbs   - fixedTotal.carbs),
+    fat:     Math.max(0, targetMacros.fat     - fixedTotal.fat),
+  };
 
-    const remaining = {
-      protein: Math.max(0, targetMacros.protein - fixedTotal.protein),
-      carbs:   Math.max(0, targetMacros.carbs   - fixedTotal.carbs),
-      fat:     Math.max(0, targetMacros.fat     - fixedTotal.fat),
-    };
+  // STEP 3 — distribute the REMAINING target only among dynamic foods.
+  const dynamicItems = flat.filter(it => it.role === 'dynamic');
+  const baseline = dynamicItems.map(it => computeItemMacros(it.name, it.base, !!it.countable));
+  const baseTotal = baseline.reduce((acc, m) => ({
+    protein: acc.protein + m.protein, carbs: acc.carbs + m.carbs, fat: acc.fat + m.fat,
+  }), { protein: 0, carbs: 0, fat: 0 });
 
-    // STEP 3 — dynamic distribution.
-    const dynamicItems = flat.filter(it => it.role === 'dynamic');
-    const density = dynamicItems.map(it =>
-      computeItemMacros(it.name, it.countable ? 1 : 100, !!it.countable)
-    );
+  const pScale = baseTotal.protein > 0 ? remaining.protein / baseTotal.protein : 1;
+  const cScale = baseTotal.carbs  > 0 ? remaining.carbs  / baseTotal.carbs  : 1;
+  const fScale = baseTotal.fat    > 0 ? remaining.fat    / baseTotal.fat    : 1;
 
-    // (a) Reserve `min`-locked grams up front so the solver targets only what's
-    //     genuinely left after those hard minimums are accounted for.
-    const { lockedAmounts, remainingAfterMins } =
-      applyMinsToRemaining(dynamicItems, remaining);
+  // Initial guess: macro-weighted blend (protein-heavy foods scale toward
+  // the protein need, carb-heavy toward carbs, fat-heavy toward fat).
+  let rawAmounts = dynamicItems.map((it, i) => {
+    const b = baseline[i];
+    const macroSum = b.protein + b.carbs + b.fat;
+    const scale = macroSum > 0 ? (b.protein * pScale + b.carbs * cScale + b.fat * fScale) / macroSum : 1;
+    return it.base * scale;
+  });
 
-    // (b) Initial guess: same macro-weighted blend, but built off remainingAfterMins.
-    const baseline = dynamicItems.map((it, i) =>
-      computeItemMacros(it.name, it.base, !!it.countable)
-    );
-    const baseTotal = baseline.reduce((a, m) => ({
-      protein: a.protein + m.protein, carbs: a.carbs + m.carbs, fat: a.fat + m.fat,
-    }), { protein: 0, carbs: 0, fat: 0 });
-    const pScale = baseTotal.protein > 0 ? remainingAfterMins.protein / baseTotal.protein : 1;
-    const cScale = baseTotal.carbs   > 0 ? remainingAfterMins.carbs   / baseTotal.carbs   : 1;
-    const fScale = baseTotal.fat     > 0 ? remainingAfterMins.fat     / baseTotal.fat     : 1;
+  const density = dynamicItems.map(it => computeItemMacros(it.name, it.countable ? 1 : 100, !!it.countable));
 
-    let raw = dynamicItems.map((it, i) => {
-      const b = baseline[i];
-      const macroSum = b.protein + b.carbs + b.fat;
-      const scale = macroSum > 0
-        ? (b.protein * pScale + b.carbs * cScale + b.fat * fScale) / macroSum
-        : 1;
-      // Never start below the item's `min` — the solver only adjusts upward from here.
-      return Math.max(it.min || 0, it.base * scale);
-    });
+  // Correction pass across the WHOLE DAY'S dynamic foods at once — far more
+  // flexibility than solving each meal in isolation, since the protein need
+  // can now be met by ANY protein-containing dynamic food anywhere in the day.
+  for (let pass = 0; pass < 8; pass++) {
+    ['protein', 'carbs', 'fat'].forEach(key => {
+      const current = dynamicItems.reduce((acc, it, i) => acc + computeItemMacros(it.name, rawAmounts[i], !!it.countable)[key], 0);
+      const gap = remaining[key] - current;
+      if (Math.abs(gap) < 0.01) return;
 
-    // (c) Correction pass — but anchor per macro is now the food whose baseline
-    //     is DOMINATED by that macro (share of its own macro-sum), not just
-    //     highest absolute value. Stops fat-heavy foods from being anchor for
-    //     protein and vice-versa.
-    const dominance = baseline.map(b => {
-      const s = b.protein + b.carbs + b.fat || 1;
-      return { protein: b.protein / s, carbs: b.carbs / s, fat: b.fat / s };
-    });
+      let anchorIdx = -1, maxShare = 0;
+      baseline.forEach((b, i) => { if (b[key] > maxShare) { maxShare = b[key]; anchorIdx = i; } });
+      if (anchorIdx === -1) return;
 
-    for (let pass = 0; pass < 20; pass++) {
-      let maxGap = 0;
-      ['protein', 'carbs', 'fat'].forEach(key => {
-        const current = dynamicItems.reduce(
-          (a, it, i) => a + computeItemMacros(it.name, raw[i], !!it.countable)[key], 0
-        );
-        const gap = remainingAfterMins[key] - current;
-        if (Math.abs(gap) > maxGap) maxGap = Math.abs(gap);
-        if (Math.abs(gap) < 0.05) return;
-
-        // Pick anchor = item most dominated by this macro AND with real density.
-        let anchorIdx = -1, best = -1;
-        dominance.forEach((d, i) => {
-          if (density[i][key] > 0 && d[key] > best) { best = d[key]; anchorIdx = i; }
-        });
-        if (anchorIdx === -1) return;
-
-        const perUnit = density[anchorIdx][key];
-        const delta = dynamicItems[anchorIdx].countable
-          ? (gap / perUnit)
-          : (gap / perUnit) * 100;
-
-        const floor = dynamicItems[anchorIdx].min || 0;
-        raw[anchorIdx] = Math.max(floor, raw[anchorIdx] + delta);
-      });
-      if (maxGap < 0.05) break;
-    }
-
-    // (d) Round once, then RE-BALANCE for rounding drift so the validator's
-    //     ±2g / ±3g / ±20 kcal tolerance is actually met.
-    let amounts = dynamicItems.map((it, i) => {
-      let a = it.countable
-        ? Math.max(1, Math.round(raw[i]))
-        : roundToStep(raw[i], it.round || 10);
-      if (it.min) a = Math.max(a, it.min);
-      return a;
-    });
-
-    const macroAt = (i, a) => computeItemMacros(dynamicItems[i].name, a, !!dynamicItems[i].countable);
-    const totalKey = (arr, key) => arr.reduce(
-      (a, amt, i) => a + macroAt(i, amt)[key], 0
-    );
-
-    // Nudge one step at a time on the food whose step-change most reduces the
-    // worst-drifting macro (protein prioritized, then carbs, then fat).
-    for (let step = 0; step < 30; step++) {
-      const gaps = {
-        protein: remaining.protein - (totalKey(amounts, 'protein') + fixedTotal.protein),
-        carbs:   remaining.carbs   - (totalKey(amounts, 'carbs')   + fixedTotal.carbs),
-        fat:     remaining.fat     - (totalKey(amounts, 'fat')     + fixedTotal.fat),
-      };
-      // Compare to what target originally asked for (net-of-fixed = remaining).
-      const gP = remaining.protein - totalKey(amounts, 'protein');
-      const gC = remaining.carbs   - totalKey(amounts, 'carbs');
-      const gF = remaining.fat     - totalKey(amounts, 'fat');
-      if (Math.abs(gP) <= 2 && Math.abs(gC) <= 3 && Math.abs(gF) <= 2) break;
-
-      const key = Math.abs(gP) > 2 ? 'protein' : Math.abs(gC) > 3 ? 'carbs' : 'fat';
-      const gap = key === 'protein' ? gP : key === 'carbs' ? gC : gF;
-      const dir = gap > 0 ? 1 : -1;
-
-      // Pick the item where one step-change in `dir` moves this macro the most
-      // without wrecking the other two, respecting min/1-unit floors.
-      let bestI = -1, bestScore = -Infinity, bestStep = 0;
-      dynamicItems.forEach((it, i) => {
-        const stepSize = it.countable ? 1 : (it.round || 10);
-        const next = amounts[i] + dir * stepSize;
-        const floor = it.countable ? 1 : (it.min || stepSize);
-        if (next < floor) return;
-        const before = macroAt(i, amounts[i]);
-        const after  = macroAt(i, next);
-        const dK = after[key] - before[key];
-        if (dir > 0 ? dK <= 0 : dK >= 0) return;
-        // Score: progress on target macro minus penalty for collateral drift.
-        const otherKeys = ['protein', 'carbs', 'fat'].filter(k => k !== key);
-        const collateral = otherKeys.reduce(
-          (a, k) => a + Math.abs((after[k] - before[k])), 0
-        );
-        const score = Math.abs(dK) - 0.5 * collateral;
-        if (score > bestScore) { bestScore = score; bestI = i; bestStep = dir * stepSize; }
-      });
-      if (bestI === -1) break;
-      amounts[bestI] += bestStep;
-    }
-
-    const finalDynamic = dynamicItems.map((it, i) => ({
-      ...it, amount: amounts[i],
-      macros: computeItemMacros(it.name, amounts[i], !!it.countable),
-    }));
-
-    // (e) Reassemble — unchanged.
-    return baseMeals.map((meal, mi) => {
-      const items = meal.items.map((item, ii) => {
-        if (item.role === 'fixed') return fixedItems.find(f => f.mi === mi && f.ii === ii);
-        return finalDynamic.find(d => d.mi === mi && d.ii === ii);
-      });
-      const macros = items.reduce((a, it) => ({
-        protein:  a.protein  + it.macros.protein,
-        carbs:    a.carbs    + it.macros.carbs,
-        fat:      a.fat      + it.macros.fat,
-        calories: a.calories + it.macros.calories,
-      }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
-      return {
-        ...meal, items,
-        macros: {
-          protein:  Math.round(macros.protein),
-          carbs:    Math.round(macros.carbs),
-          fat:      Math.round(macros.fat),
-          calories: Math.round(macros.calories),
-        },
-      };
+      const perUnit = density[anchorIdx][key];
+      if (!perUnit || perUnit <= 0) return;
+      const unitsNeeded = dynamicItems[anchorIdx].countable ? (gap / perUnit) : (gap / perUnit) * 100;
+      rawAmounts[anchorIdx] = Math.max(0, rawAmounts[anchorIdx] + unitsNeeded);
     });
   }
-
 
   // Round every dynamic food to a realistic, clean quantity. Foods with a
   // `min` (e.g. Soya Chunks — must NEVER go below 50g regardless of what
@@ -406,6 +270,9 @@ const OPTIONAL_MEALS = {
       },
     };
   });
+
+  return scaledMeals;
+}
 
 // ─── Validate that the meal breakdown actually adds up to the target ─────────
 function validateDietPlan(scaledMeals, targetMacros) {
