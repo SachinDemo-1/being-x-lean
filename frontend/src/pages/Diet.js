@@ -5,6 +5,10 @@ import { useAuth } from '../context/AuthContext';
 import { hasPlan } from '../context/purchases';
 import './Diet.css';
 
+// ─── Temporary toggle: set to true to disable Non-Veg selection (e.g. during
+// festival/holiday days). Flip back to false to re-enable it.
+const NONVEG_DISABLED = true;
+
 // ═══════════════════════════════════════════════════════════════════════════
 // DIET CALCULATION ENGINE — v3
 //
@@ -585,9 +589,15 @@ function SurveyModal({ planType, onClose, onSubmit, loading, initialData }) {
               <div className="diet-pref-cards">
                 {[
                   { val:'veg', icon:'🥦', label:'Vegetarian', desc:'Paneer, Soya, Dal' },
-                  { val:'nonveg', icon:'🍗', label:'Non-Vegetarian', desc:'Chicken, Fish, Eggs' },
+                  { val:'nonveg', icon:'🍗', label:'Non-Vegetarian', desc: NONVEG_DISABLED ? 'Unavailable today' : 'Chicken, Fish, Eggs', disabled: NONVEG_DISABLED },
                 ].map(d => (
-                  <button key={d.val} className={`diet-pref-card ${form.dietType===d.val?'active':''}`} onClick={() => set('dietType', d.val)}>
+                  <button
+                    key={d.val}
+                    className={`diet-pref-card ${form.dietType===d.val?'active':''}`}
+                    disabled={d.disabled}
+                    style={d.disabled ? { opacity: 0.4, filter: 'grayscale(1)', cursor: 'not-allowed', pointerEvents: 'none' } : undefined}
+                    onClick={() => { if (!d.disabled) set('dietType', d.val); }}
+                  >
                     <div style={{fontSize:32}}>{d.icon}</div>
                     <div className="diet-pref-label">{d.label}</div>
                     <div className="diet-pref-desc">{d.desc}</div>
