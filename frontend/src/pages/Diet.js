@@ -186,7 +186,7 @@ const BASE_MEALS = {
     { id: 'meal5', name: 'Dinner', time: '8:00 PM', icon: '🥣',
       items: [
         { name: 'Paneer', role: 'fixed', unit: 'g', amount: 100 },
-        { name: 'Fried Rice', role: 'dynamic', unit: 'g', base: 150, round: 25, max: 300 },
+        { name: 'Fried Rice', role: 'dynamic', unit: 'g', base: 150, round: 10 ,min:200, max: 300 },
         { name: 'Mixed Vegetables', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
         { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
       ] },
