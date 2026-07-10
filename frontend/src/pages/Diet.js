@@ -806,7 +806,7 @@ export default function Diet() {
       //    protein*4 + fat*9 + carbs*4 === targetCalories, exactly.
       const proteinG = Math.round(w * 2);
       const fatG = Math.round(w * 1);
-      const remainingCal = targetCalories - (proteinG * 4) - (fatG * 9);
+      const remainingCal = targetCalories - (proteinG * 2) - (fatG * 9);
       const carbsG = Math.round(remainingCal / 4);
       const targetMacros = { protein: proteinG, carbs: carbsG, fat: fatG, calories: targetCalories };
 
