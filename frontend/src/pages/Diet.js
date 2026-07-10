@@ -407,9 +407,6 @@ const OPTIONAL_MEALS = {
     };
   });
 
-  return scaledMeals;
-}
-
 // ─── Validate that the meal breakdown actually adds up to the target ─────────
 function validateDietPlan(scaledMeals, targetMacros) {
   const sum = scaledMeals.reduce((acc, m) => ({
