@@ -133,7 +133,7 @@ const BASE_MEALS = {
       items: [
         { name: 'Oats', role: 'dynamic', unit: 'g', base: 60, round: 10,min: 30, max: 60 },
         { name: 'Milk', role: 'fixed', unit: 'ml', amount: 250 },
-        { name: 'Banana', role: 'dynamic', unit: 'pc', base: 1, countable: true },
+        { name: 'Banana', role: 'dynamic', unit: 'pc', base: 1, countable: true , max: 1 },
         { name: 'Almonds', role: 'fixed', unit: 'pc', amount: 15, countable: true },
       ] },
     { id: 'meal2', name: 'Post-Workout', time: '10:00 AM', icon: '💪',
@@ -156,8 +156,8 @@ const BASE_MEALS = {
       ] },
     { id: 'meal5', name: 'Dinner', time: '9:00 PM', icon: '🍲',
       items: [
-        { name: 'Paneer', role: 'fixed', unit: 'g', amount: 100 },
-        { name: 'Roti', role: 'dynamic', unit: 'pc', base: 3, countable: true },
+        { name: 'Paneer', role: 'fixed', unit: 'g', amount: 150 },
+        { name: 'Roti', role: 'dynamic', unit: 'pc', base: 3, countable: true , min: 3, max:4 },
         { name: 'Mixed Vegetables', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
         { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
       ] },
