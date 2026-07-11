@@ -131,7 +131,7 @@ const BASE_MEALS = {
   muscle_gain: [
     { id: 'meal1', name: 'Pre-Workout', time: '7:00 AM', icon: '🌅',
       items: [
-        { name: 'Oats', role: 'dynamic', unit: 'g', base: 60, round: 5,min: 40, max: 50 },
+        { name: 'Oats', role: 'dynamic', unit: 'g', base: 60, round: 5,min: 30, max: 40 },
         { name: 'Milk', role: 'fixed', unit: 'ml', amount: 250 },
         { name: 'Banana', role: 'dynamic', unit: 'pc', base: 1, countable: true , max: 1 },
         { name: 'Almonds', role: 'fixed', unit: 'pc', amount: 15, countable: true },
@@ -170,7 +170,7 @@ const BASE_MEALS = {
       ] },
     { id: 'meal2', name: 'Post-Workout', time: '8:00 AM', icon: '🥤',
       items: [
-        { name: 'Oats', role: 'dynamic', unit: 'g', base: 40, round: 5, min:25 , max: 50 },
+        { name: 'Oats', role: 'dynamic', unit: 'g', base: 40, round: 5, min:25 , max: 40 },
         { name: 'Whey Protein', role: 'fixed', unit: 'scoop', amount: 1, countable: true },
         { name: 'Milk', role: 'fixed', unit: 'ml', amount: 250 },
         { name: 'Banana', role: 'dynamic', unit: 'pc', base: 1, countable: true },
