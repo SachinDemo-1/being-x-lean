@@ -197,6 +197,15 @@ const BASE_MEALS = {
   ],
 };
 
+
+// ─── Fixed per-meal CARB weight ratios (only used for distributing the day's
+// carb target across meals — protein/fat/calories are untouched and still
+// follow real food macros). Numbers are relative weights, not grams —
+// they get scaled to whatever the day's total carb target is.
+const MEAL_CARB_WEIGHTS = {
+  muscle_gain: [63, 44, 91, 17, 90], // Meal1 Pre-Workout, Meal2 Post-Workout, Meal3 Lunch, Meal4 Evening, Meal5 Dinner
+};
+
 // ─── Optional bonus meal — shown at the end, NOT counted toward the day's
 // calorie/protein/carb/fat target totals (purely an "if you need more" add-on)
 const OPTIONAL_MEALS = {
@@ -217,7 +226,7 @@ const OPTIONAL_MEALS = {
 //         the whole day, then round every quantity to a realistic number.
 // STEP 4: apportion each macro's rounded meal totals so they sum EXACTLY to
 //         targetMacros (largest-remainder method) — no drift, ever.
-function generateDietPlan(baseMeals, targetMacros) {
+function generateDietPlan(baseMeals, targetMacros, goal) {
   // Flatten every item across all meals, remembering where it came from.
   const flat = [];
   baseMeals.forEach((meal, mi) => {
@@ -317,8 +326,15 @@ function generateDietPlan(baseMeals, targetMacros) {
   const proteinAlloc  = distributeIntegerWithRemainder(targetMacros.protein,  mealsWithItems.map(m => m.realMacros.protein));
   const carbsAlloc    = distributeIntegerWithRemainder(targetMacros.carbs,    mealsWithItems.map(m => m.realMacros.carbs));
   const fatAlloc      = distributeIntegerWithRemainder(targetMacros.fat,      mealsWithItems.map(m => m.realMacros.fat));
-  const caloriesAlloc = distributeIntegerWithRemainder(targetMacros.calories, mealsWithItems.map(m => m.realMacros.calories));
-
+  const carbWeights = MEAL_CARB_WEIGHTS[goal];
+    let carbsAlloc;
+    if (carbWeights && carbWeights.length === mealsWithItems.length) {
+      const totalWeight = carbWeights.reduce((a, b) => a + b, 0);
+      const weightedCarbs = carbWeights.map(w => (w / totalWeight) * targetMacros.carbs);
+      carbsAlloc = distributeIntegerWithRemainder(targetMacros.carbs, weightedCarbs);
+    } else {
+      carbsAlloc = distributeIntegerWithRemainder(targetMacros.carbs, mealsWithItems.map(m => m.realMacros.carbs));
+    }
   const scaledMeals = mealsWithItems.map((meal, mi) => ({
     ...meal,
     macros: {
@@ -892,7 +908,7 @@ export default function Diet() {
       // 3+4+5. Split the day's targets across meals, then derive real
       // ingredient quantities that hit each meal's slice of those targets.
       const baseMeals = BASE_MEALS[goal] || BASE_MEALS.muscle_gain;
-      const scaledMeals = generateDietPlan(baseMeals, targetMacros);
+      const scaledMeals = generateDietPlan(baseMeals, targetMacros, goal);
 
       // 6. Validate: sum of all meals should equal the target exactly.
       const { sum } = validateDietPlan(scaledMeals, targetMacros);
