@@ -70,6 +70,8 @@ const NUTRITION = {
   'Curd':                              { perUnit: { p: 6.0, c: 7.0,  f: 4.5 } }, // 1 bowl (~150g)
   'Dal/Rajma + Sabzi':                 { perUnit: { p: 10.0,c: 28.0, f: 5.0 } }, // 1 bowl
   'Mixed Vegetables':                  { perUnit: { p: 3.0, c: 10.0, f: 3.0 } }, // 1 bowl
+  'Paneer/Tofu': { per100: { p: 18.3, c: 1.2, f: 20.8 } }, // same as Paneer
+  'Rice/Roti':   { per100: { p: 2.7, c: 28.2, f: 0.3 }, perUnit: { p: 3.2, c: 18.0, f: 1.2 } }, // per100 = cooked rice, perUnit = 1 roti
 };
 function computeItemMacros(name, amount, isCountable) {
   const entry = NUTRITION[name];
