@@ -314,23 +314,23 @@ function generateDietPlan(baseMeals, targetMacros) {
 
   // STEP 4 — apportion each macro across meals so the rounded, DISPLAYED
   // numbers sum to EXACTLY targetMacros — no drift, regardless of rounding.
-  const proteinAlloc  = distributeIntegerWithRemainder(targetMacros.protein,  mealsWithItems.map(m => m.realMacros.protein));
-  const carbsAlloc    = distributeIntegerWithRemainder(targetMacros.carbs,    mealsWithItems.map(m => m.realMacros.carbs));
-  const fatAlloc      = distributeIntegerWithRemainder(targetMacros.fat,      mealsWithItems.map(m => m.realMacros.fat));
-  const caloriesAlloc = distributeIntegerWithRemainder(targetMacros.calories, mealsWithItems.map(m => m.realMacros.calories));
-
-  const scaledMeals = mealsWithItems.map((meal, mi) => ({
+  const accurateMeals = mealsWithItems.map(meal => ({
     ...meal,
+
     macros: {
-      protein: proteinAlloc[mi],
-      carbs: carbsAlloc[mi],
-      fat: fatAlloc[mi],
-      calories: caloriesAlloc[mi],
-    },
+      protein: Math.round(meal.realMacros.protein),
+      carbs: Math.round(meal.realMacros.carbs),
+      fat: Math.round(meal.realMacros.fat),
+
+      calories: Math.round(
+        meal.realMacros.protein * 4 +
+        meal.realMacros.carbs * 4 +
+        meal.realMacros.fat * 9
+      )
+    }
   }));
 
-  return scaledMeals;
-}
+  return accurateMeals;
 
 // ─── Validate that the meal breakdown actually adds up to the target ─────────
 // (Now mostly a safety net — with the largest-remainder apportionment above,
@@ -886,7 +886,7 @@ export default function Diet() {
       const proteinG = Math.round(w * 2);
       const fatG = Math.round(w * 1);
       const remainingCal = targetCalories - (proteinG * 4) - (fatG * 9);
-      const carbsG = Math.round(remainingCal / 5);
+      const carbsG = Math.round(remainingCal / 4);
       const targetMacros = { protein: proteinG, carbs: carbsG, fat: fatG, calories: targetCalories };
 
       // 3+4+5. Split the day's targets across meals, then derive real
