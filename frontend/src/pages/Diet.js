@@ -314,23 +314,22 @@ function generateDietPlan(baseMeals, targetMacros) {
 
   // STEP 4 — apportion each macro across meals so the rounded, DISPLAYED
   // numbers sum to EXACTLY targetMacros — no drift, regardless of rounding.
-    const accurateMeals = mealsWithItems.map(meal => ({
-      ...meal,
+  const proteinAlloc  = distributeIntegerWithRemainder(targetMacros.protein,  mealsWithItems.map(m => m.realMacros.protein));
+  const carbsAlloc    = distributeIntegerWithRemainder(targetMacros.carbs,    mealsWithItems.map(m => m.realMacros.carbs));
+  const fatAlloc      = distributeIntegerWithRemainder(targetMacros.fat,      mealsWithItems.map(m => m.realMacros.fat));
+  const caloriesAlloc = distributeIntegerWithRemainder(targetMacros.calories, mealsWithItems.map(m => m.realMacros.calories));
 
-      macros: {
-        protein: Math.round(meal.realMacros.protein*1.15),
-        carbs: Math.round(meal.realMacros.carbs*1.15),
-        fat: Math.round(meal.realMacros.fat*1.15),
+  const scaledMeals = mealsWithItems.map((meal, mi) => ({
+    ...meal,
+    macros: {
+      protein: proteinAlloc[mi],
+      carbs: carbsAlloc[mi],
+      fat: fatAlloc[mi],
+      calories: caloriesAlloc[mi],
+    },
+  }));
 
-        calories: Math.round(
-          meal.realMacros.protein * 7 +
-          meal.realMacros.carbs * 6 +
-          meal.realMacros.fat * 10
-        )
-      }
-    }));
-
-    return accurateMeals;
+  return scaledMeals;
 }
 
 // ─── Validate that the meal breakdown actually adds up to the target ─────────
@@ -375,7 +374,7 @@ function resolveOptionalMeals(goal) {
       carbs: acc.carbs + it.macros.carbs,
       fat: acc.fat + it.macros.fat,
       calories: acc.calories + it.macros.calories,
-    }), { protein: 0, carbs: 0, fat: 0, calories: 500 });
+    }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
     return {
       ...meal,
       items,
@@ -887,7 +886,7 @@ export default function Diet() {
       const proteinG = Math.round(w * 2);
       const fatG = Math.round(w * 1);
       const remainingCal = targetCalories - (proteinG * 4) - (fatG * 9);
-      const carbsG = Math.round(remainingCal / 4);
+      const carbsG = Math.round(remainingCal / 5.5);
       const targetMacros = { protein: proteinG, carbs: carbsG, fat: fatG, calories: targetCalories };
 
       // 3+4+5. Split the day's targets across meals, then derive real
