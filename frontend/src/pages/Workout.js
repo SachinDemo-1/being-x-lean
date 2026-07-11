@@ -33,6 +33,7 @@ import RopeTricepsPushdown from '../assets/gifs/RopeTricepsPushdown.gif';
 import onehandtri from '../assets/gifs/onehandtri.gif';
 import reardelt from '../assets/gifs/reardelt.gif';
 import reversepecdec1 from '../assets/gifs/reversepecdec1.gif';
+import oneArmTricepPushDown from '../assets/gifs/oneArmTricepPushDown.gif';
 
 
 // ── Exercise GIF URLs ──────────────────────────────────────────────────────────
@@ -63,7 +64,7 @@ const EXERCISE_GIFS = {
   // Arms - Triceps
   'tricep-pushdown':       RopeTricepsPushdown,
   'overhead-ext':          onehandtri,
-  'single-arm-tricep-ext': overheadext,
+  'single-arm-tricep-ext': oneArmTricepPushDown,
   // Legs
   'squat':                 squats,
   'leg-press':             legpress,
