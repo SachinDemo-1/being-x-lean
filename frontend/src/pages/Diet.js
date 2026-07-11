@@ -131,7 +131,7 @@ const BASE_MEALS = {
   muscle_gain: [
     { id: 'meal1', name: 'Pre-Workout', time: '7:00 AM', icon: '🌅',
       items: [
-        { name: 'Oats', role: 'dynamic', unit: 'g', base: 60, round: 10,min: 30, max: 60 },
+        { name: 'Oats', role: 'dynamic', unit: 'g', base: 60, round: 5,min: 40, max: 50 },
         { name: 'Milk', role: 'fixed', unit: 'ml', amount: 250 },
         { name: 'Banana', role: 'dynamic', unit: 'pc', base: 1, countable: true , max: 1 },
         { name: 'Almonds', role: 'fixed', unit: 'pc', amount: 15, countable: true },
@@ -165,12 +165,12 @@ const BASE_MEALS = {
   fat_loss: [
     { id: 'meal1', name: 'Pre-Workout', time: '6:30 AM', icon: '🌅',
       items: [
-        { name: 'Upma / Poha', role: 'dynamic', unit: 'g', base: 150, round: 25 , max:200},
+        { name: 'Upma / Poha', role: 'dynamic', unit: 'g', base: 150, round: 10 ,min:100, max:150},
         { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
       ] },
     { id: 'meal2', name: 'Post-Workout', time: '8:00 AM', icon: '🥤',
       items: [
-        { name: 'Oats', role: 'dynamic', unit: 'g', base: 40, round: 10, min:25 , max: 60 },
+        { name: 'Oats', role: 'dynamic', unit: 'g', base: 40, round: 5, min:25 , max: 50 },
         { name: 'Whey Protein', role: 'fixed', unit: 'scoop', amount: 1, countable: true },
         { name: 'Milk', role: 'fixed', unit: 'ml', amount: 250 },
         { name: 'Banana', role: 'dynamic', unit: 'pc', base: 1, countable: true },
