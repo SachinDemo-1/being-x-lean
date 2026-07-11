@@ -318,12 +318,12 @@ function generateDietPlan(baseMeals, targetMacros) {
       ...meal,
 
       macros: {
-        protein: Math.round(meal.realMacros.protein*1.2),
-        carbs: Math.round(meal.realMacros.carbs*1.2),
-        fat: Math.round(meal.realMacros.fat*1.2),
+        protein: Math.round(meal.realMacros.protein*1.15),
+        carbs: Math.round(meal.realMacros.carbs*1.15),
+        fat: Math.round(meal.realMacros.fat*1.15),
 
         calories: Math.round(
-          meal.realMacros.protein * 6 +
+          meal.realMacros.protein * 7 +
           meal.realMacros.carbs * 6 +
           meal.realMacros.fat * 10
         )
