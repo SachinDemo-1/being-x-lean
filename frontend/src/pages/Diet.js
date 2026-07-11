@@ -60,6 +60,9 @@ const NUTRITION = {
   'Roasted Chana / Sprouts Moong Dal': { per100: { p: 20.0, c: 55.0, f: 5.0 } },
   'Chicken':                           { per100: { p: 31.0, c: 0.0,  f: 3.6 } }, // Cooked Chicken Breast
   'Eggs':                              { perUnit: { p: 6.3, c: 0.4,  f: 5.3 } }, // 1 large egg
+  'Boiled Potato/Sweet Patato':        { per100: { p: 1.9, c: 20.1, f: 0.1 }, perUnit: { p: 2.85, c: 30.15, f: 0.15 } },
+  'Rice/Roti':                         { per100: { p: 2.7, c: 28.2, f: 0.3 }, perUnit: { p: 3.2, c: 18.0, f: 1.2 } },
+  'Paneer/Tofu':                       { per100: { p: 18.3, c: 1.2, f: 20.8 } },
 
   // Fixed (never scale — quantity is always the same)
 
@@ -70,8 +73,8 @@ const NUTRITION = {
   'Curd':                              { perUnit: { p: 6.0, c: 7.0,  f: 4.5 } }, // 1 bowl (~150g)
   'Dal/Rajma + Sabzi':                 { perUnit: { p: 10.0,c: 28.0, f: 5.0 } }, // 1 bowl
   'Mixed Vegetables':                  { perUnit: { p: 3.0, c: 10.0, f: 3.0 } }, // 1 bowl
-  'Paneer/Tofu': { per100: { p: 18.3, c: 1.2, f: 20.8 } }, // same as Paneer
-  'Rice/Roti':   { per100: { p: 2.7, c: 28.2, f: 0.3 }, perUnit: { p: 3.2, c: 18.0, f: 1.2 } }, // per100 = cooked rice, perUnit = 1 roti
+  'Paneer/Tofu':                       { per100: { p: 18.3, c: 1.2, f: 20.8 } }, // same as Paneer
+  'Rice/Roti':                         { per100: { p: 2.7, c: 28.2, f: 0.3 }, perUnit: { p: 3.2, c: 18.0, f: 1.2 } }, // per100 = cooked rice, perUnit = 1 roti
 };
 function computeItemMacros(name, amount, isCountable) {
   const entry = NUTRITION[name];
