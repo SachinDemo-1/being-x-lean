@@ -903,7 +903,7 @@ export default function Diet() {
       const proteinG = Math.round(w * 2);
       const fatG = Math.round(w * 1);
       const remainingCal = targetCalories - (proteinG * 4) - (fatG * 9);
-      const carbsG = Math.round(remainingCal / 6);
+      const carbsG = Math.round(remainingCal / 6.5);
       const targetMacros = { protein: proteinG, carbs: carbsG, fat: fatG, calories: targetCalories };
 
       // 3+4+5. Split the day's targets across meals, then derive real
