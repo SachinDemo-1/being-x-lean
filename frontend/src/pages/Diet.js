@@ -375,7 +375,7 @@ function resolveOptionalMeals(goal) {
       carbs: acc.carbs + it.macros.carbs,
       fat: acc.fat + it.macros.fat,
       calories: acc.calories + it.macros.calories,
-    }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
+    }), { protein: 0, carbs: 0, fat: 0, calories: 500 });
     return {
       ...meal,
       items,
