@@ -141,7 +141,7 @@ const BASE_MEALS = {
         { name: 'Whey Protein', role: 'fixed', unit: 'scoop', amount: 1, countable: true },
         { name: 'Brown Bread', role: 'fixed', unit: 'slice', amount: 2, countable: true },
         { name: 'Peanut Butter', role: 'fixed', unit: 'spoon', amount: 1, countable: true },
-        { name: 'Boiled Potato', role: 'fixed', unit: 'pc', amount: 1, countable: true },
+        { name: 'Boiled Potato/Sweet Patato', role: 'fixed', unit: 'pc', amount: 1, countable: true },
       ] },
     { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
       items: [
@@ -627,7 +627,7 @@ function SurveyModal({ planType, onClose, onSubmit, loading, initialData }) {
           {step < 3
             ? <button className="diet-btn-next" disabled={step===1 && !valid1} onClick={() => setStep(s => s+1)}>Next →</button>
             : <button className="diet-btn-generate" disabled={loading} onClick={() => onSubmit({ ...form, goal: planType })}>
-                {loading ? '⏳ Generating...' : '⚡ Generate My Plan'}
+                {loading ? '⏳ Applying...' : '⚡ Get My Plan'}
               </button>
           }
         </div>
