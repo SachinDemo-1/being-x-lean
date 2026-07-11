@@ -314,23 +314,24 @@ function generateDietPlan(baseMeals, targetMacros) {
 
   // STEP 4 — apportion each macro across meals so the rounded, DISPLAYED
   // numbers sum to EXACTLY targetMacros — no drift, regardless of rounding.
-  const accurateMeals = mealsWithItems.map(meal => ({
-    ...meal,
+    const accurateMeals = mealsWithItems.map(meal => ({
+      ...meal,
 
-    macros: {
-      protein: Math.round(meal.realMacros.protein),
-      carbs: Math.round(meal.realMacros.carbs),
-      fat: Math.round(meal.realMacros.fat),
+      macros: {
+        protein: Math.round(meal.realMacros.protein),
+        carbs: Math.round(meal.realMacros.carbs),
+        fat: Math.round(meal.realMacros.fat),
 
-      calories: Math.round(
-        meal.realMacros.protein * 4 +
-        meal.realMacros.carbs * 4 +
-        meal.realMacros.fat * 9
-      )
-    }
-  }));
+        calories: Math.round(
+          meal.realMacros.protein * 4 +
+          meal.realMacros.carbs * 4 +
+          meal.realMacros.fat * 9
+        )
+      }
+    }));
 
-  return accurateMeals;
+    return accurateMeals;
+}
 
 // ─── Validate that the meal breakdown actually adds up to the target ─────────
 // (Now mostly a safety net — with the largest-remainder apportionment above,
