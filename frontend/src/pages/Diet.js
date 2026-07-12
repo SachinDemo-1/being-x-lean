@@ -918,7 +918,7 @@ export default function Diet() {
       // 2. Macro targets — protein & fat driven directly by bodyweight,
       //    carbs fill whatever calories are left. This guarantees
       //    protein*4 + fat*9 + carbs*4 === targetCalories, exactly.
-      const proteinG = Math.round(w * 2);
+      const proteinG = Math.round(w * 2.2);
       const fatG = Math.round(w * 1.3);
       const remainingCal = targetCalories - (proteinG * 4) - (fatG * 9);
       const carbsG = Math.round(remainingCal / 6.5);
