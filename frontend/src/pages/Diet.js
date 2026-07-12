@@ -10,7 +10,7 @@ import './Diet.css';
 const NONVEG_DISABLED = true;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// DIET CALCULATION ENGINE — v4
+// DIET CALCULATION ENGINE — v5
 //
 // Architecture:
 //  • Every food is tagged FIXED or DYNAMIC.
@@ -27,15 +27,19 @@ const NONVEG_DISABLED = true;
 //  • HARD MIN/MAX: a dynamic food can carry `min`/`max` — floors/ceilings
 //    enforced AFTER rounding/solving, so the macro solver can still scale
 //    it but it can never leave that realistic range.
-//  • EXACT TOTALS: meal-level protein/fat/calories are apportioned across
-//    all meals at once using a largest-remainder method, so the meals'
-//    rounded totals ALWAYS sum to EXACTLY the day's target — zero drift.
-//  • CARBS (NEW in v4): carbs are the ONE macro apportioned using FIXED
-//    per-meal weight ratios (MEAL_CARB_WEIGHTS) instead of each meal's real
-//    food-derived carb amount. This lets carbs be shaped to match a desired
-//    per-meal distribution (e.g. lower at Evening snack, higher at Lunch/
-//    Dinner) while protein, fat, and calories keep following the real
-//    macros of the foods actually assigned to each meal — untouched.
+//  • EXACT TOTALS: meal-level protein/fat are apportioned across all meals
+//    at once using a largest-remainder method, so the meals' rounded
+//    totals ALWAYS sum to EXACTLY the day's target — zero drift.
+//  • CARBS: carbs are the ONE macro apportioned using FIXED per-meal weight
+//    ratios (MEAL_CARB_WEIGHTS) instead of each meal's real food-derived
+//    carb amount. This lets carbs be shaped to match a desired per-meal
+//    distribution while protein and fat keep following the real macros of
+//    the foods actually assigned to each meal — untouched.
+//  • CALORIES (NEW in v5): calories are NEVER apportioned separately —
+//    they are always DERIVED from that same meal's own final protein/
+//    carbs/fat (4/4/9 kcal per g). This guarantees every meal's displayed
+//    calories are internally consistent with its own macros, no matter how
+//    carbs got reshaped by MEAL_CARB_WEIGHTS.
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ─── Nutrition per 100g/100ml (gram-based) or per single unit (countable:
@@ -73,8 +77,6 @@ const NUTRITION = {
   'Curd':                              { perUnit: { p: 6.0, c: 7.0,  f: 4.5 } }, // 1 bowl (~150g)
   'Dal/Rajma + Sabzi':                 { perUnit: { p: 10.0,c: 28.0, f: 5.0 } }, // 1 bowl
   'Mixed Vegetables':                  { perUnit: { p: 3.0, c: 10.0, f: 3.0 } }, // 1 bowl
-  'Paneer/Tofu':                       { per100: { p: 18.3, c: 1.2, f: 20.8 } }, // same as Paneer
-  'Rice/Roti':                         { per100: { p: 2.7, c: 28.2, f: 0.3 }, perUnit: { p: 3.2, c: 18.0, f: 1.2 } }, // per100 = cooked rice, perUnit = 1 roti
 };
 function computeItemMacros(name, amount, isCountable) {
   const entry = NUTRITION[name];
@@ -124,9 +126,9 @@ function distributeIntegerWithRemainder(total, realValues) {
 }
 
 // ─── Fixed per-meal CARB weight ratios (only used for distributing the day's
-// carb target across meals — protein/fat/calories are untouched and still
-// follow real food macros). Numbers are relative weights, not grams —
-// they get scaled to whatever the day's total carb target is.
+// carb target across meals — protein/fat are untouched and still follow
+// real food macros). Numbers are relative weights, not grams — they get
+// scaled to whatever the day's total carb target is.
 // Order matches the meal order in BASE_MEALS for that goal.
 const MEAL_CARB_WEIGHTS = {
   muscle_gain: [63, 44, 91, 17, 90], // Meal1 Pre-Workout, Meal2 Post-Workout, Meal3 Lunch, Meal4 Evening, Meal5 Dinner
@@ -224,10 +226,12 @@ const OPTIONAL_MEALS = {
 // STEP 2: sum every FIXED food's real macros and subtract from the target.
 // STEP 3: distribute what's LEFT across dynamic foods only, solved once for
 //         the whole day, then round every quantity to a realistic number.
-// STEP 4: apportion protein/fat/calories using real per-meal macros
+// STEP 4: apportion protein/fat using real per-meal macros
 //         (largest-remainder method) — no drift.
 //         CARBS use fixed MEAL_CARB_WEIGHTS ratios instead (if defined for
 //         this goal), so carbs land where you want them per meal.
+//         CALORIES are derived from each meal's OWN final protein/carbs/fat
+//         (never apportioned separately) — always internally consistent.
 function generateDietPlan(baseMeals, targetMacros, goal) {
   // Flatten every item across all meals, remembering where it came from.
   const flat = [];
@@ -322,15 +326,14 @@ function generateDietPlan(baseMeals, targetMacros, goal) {
     return { ...meal, items, realMacros };
   });
 
-  // STEP 4 — apportion each macro across meals so the rounded, DISPLAYED
+  // STEP 4 — apportion protein/fat across meals so the rounded, DISPLAYED
   // numbers sum to EXACTLY targetMacros — no drift, regardless of rounding.
   const proteinAlloc  = distributeIntegerWithRemainder(targetMacros.protein,  mealsWithItems.map(m => m.realMacros.protein));
   const fatAlloc      = distributeIntegerWithRemainder(targetMacros.fat,      mealsWithItems.map(m => m.realMacros.fat));
-  const caloriesAlloc = distributeIntegerWithRemainder(targetMacros.calories, mealsWithItems.map(m => m.realMacros.calories));
 
   // CARBS — use fixed per-meal weight ratios if defined for this goal,
   // otherwise fall back to the real-macro-based apportionment (same as
-  // protein/fat/calories above).
+  // protein/fat above).
   const carbWeights = MEAL_CARB_WEIGHTS[goal];
   let carbsAlloc;
   if (carbWeights && carbWeights.length === mealsWithItems.length) {
@@ -340,6 +343,14 @@ function generateDietPlan(baseMeals, targetMacros, goal) {
   } else {
     carbsAlloc = distributeIntegerWithRemainder(targetMacros.carbs, mealsWithItems.map(m => m.realMacros.carbs));
   }
+
+  // CALORIES — always derived from THIS meal's own final protein/carbs/fat
+  // (4/4/9 kcal per g), never apportioned separately. This guarantees every
+  // meal's calorie number is internally consistent with its own macros,
+  // no matter how carbs got reshaped by MEAL_CARB_WEIGHTS above.
+  const caloriesAlloc = mealsWithItems.map((m, mi) =>
+    Math.round(proteinAlloc[mi] * 4 + carbsAlloc[mi] * 4 + fatAlloc[mi] * 9)
+  );
 
   const scaledMeals = mealsWithItems.map((meal, mi) => ({
     ...meal,
@@ -355,8 +366,11 @@ function generateDietPlan(baseMeals, targetMacros, goal) {
 }
 
 // ─── Validate that the meal breakdown actually adds up to the target ─────────
-// (Now mostly a safety net — with the largest-remainder apportionment above,
-// diffs should always be exactly 0 for protein/carbs/fat/calories.)
+// (Now mostly a safety net. Protein/carbs/fat should always sum exactly to
+// target. Calories are derived per-meal, so their sum equals
+// protein*4 + carbs*4 + fat*9 of the FINAL macros, which may differ slightly
+// from the originally requested targetMacros.calories if that value wasn't
+// itself perfectly 4/4/9-consistent — this is expected and intentional.)
 function validateDietPlan(scaledMeals, targetMacros) {
   const sum = scaledMeals.reduce((acc, m) => ({
     protein: acc.protein + m.macros.protein,
@@ -374,8 +388,7 @@ function validateDietPlan(scaledMeals, targetMacros) {
   const valid =
     diffs.protein === 0 &&
     diffs.carbs === 0 &&
-    diffs.fat === 0 &&
-    diffs.calories === 0;
+    diffs.fat === 0;
 
   if (!valid) {
     console.warn('[Diet plan] Meal totals drifted from target:', diffs);
@@ -916,11 +929,18 @@ export default function Diet() {
       const baseMeals = BASE_MEALS[goal] || BASE_MEALS.muscle_gain;
       const scaledMeals = generateDietPlan(baseMeals, targetMacros, goal);
 
-      // 6. Validate: sum of all meals should equal the target exactly.
+      // 6. Validate: sum of all meals should equal the target exactly
+      //    for protein/carbs/fat. Calories are derived per-meal, so their
+      //    sum is naturally consistent with those final macros.
       const { sum } = validateDietPlan(scaledMeals, targetMacros);
 
       // Optional bonus meal(s) — shown separately, never counted in the totals above.
       const optionalMeals = resolveOptionalMeals(goal);
+
+      // The daily "actual calories" shown to the user is now derived from
+      // the FINAL protein/carbs/fat targets (same 4/4/9 rule as every meal),
+      // so it always matches the sum of the per-meal calorie numbers.
+      const actualCalories = targetMacros.protein * 4 + targetMacros.carbs * 4 + targetMacros.fat * 9;
 
       const planData = {
         meals: scaledMeals,
@@ -928,7 +948,7 @@ export default function Diet() {
         userInfo: formData,
         macros: { protein: targetMacros.protein, carbs: targetMacros.carbs, fat: targetMacros.fat },
         targetCalories,
-        actualCalories: targetMacros.calories,
+        actualCalories,
         tdee,
       };
       setPlanResult(planData);
