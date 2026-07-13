@@ -10,36 +10,42 @@ import './Diet.css';
 const NONVEG_DISABLED = true;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// DIET CALCULATION ENGINE — v9 (WEIGHT-BRACKET MEAL PLANS)
+// DIET CALCULATION ENGINE — v10 (MATHEMATICAL MACRO SOLVER)
 //
-// The plan a user sees now depends on which WEIGHT BRACKET their entered
-// weight falls into. There are 4 brackets, matching the reference chart:
+// This replaces the old fixed weight-bracket plans with a real calculator:
 //
-//   40–50 kg   → key '40_50'
-//   51–60 kg   → key '51_60'
-//   61–70 kg   → key '61_70'
-//   71–80 kg   → key '71_80'  (also used as fallback for anything > 80kg)
-//
-// Every quantity inside BASE_MEALS[goal][bracketKey] is a FIXED number,
-// exactly as specified for that bracket — nothing is scaled, guessed, or
-// solved at runtime. To change a bracket's plan, edit its numbers directly
-// below; nothing else needs to change.
-//
-// Macros (Protein/Carbs/Fat) for each meal are computed by summing the
-// real nutrition of that bracket's fixed quantities (see NUTRITION table),
-// rounding, then deriving calories from those SAME rounded numbers
-// (4/4/9 kcal/g) — so a meal's displayed calories always exactly match
-// its own displayed protein/carbs/fat. No manual macro overrides are used
-// anymore, so there is nothing that can silently drift out of sync with
-// the food list.
+//   1. TDEE is computed with Mifflin-St Jeor, same as before.
+//   2. Target calories = TDEE + surplus (muscle gain) or TDEE - deficit
+//      (fat loss) — unchanged from before.
+//   3. Target PROTEIN / CARBS / FAT are derived mathematically from that
+//      calorie target (see computeTargetMacros) — nothing is guessed.
+//   4. Every food item's nutrition comes ONLY from the fixed per-100g /
+//      per-unit table below (FOODS) — these are standard reference values,
+//      nothing is invented.
+//   5. A meal template (protein + carb + fat source per meal) is built for
+//      the person's goal and diet type.
+//   6. A solver (solveMealPlan) then adjusts each food's quantity in
+//      REALISTIC steps (e.g. rice in 50g steps, eggs as whole numbers,
+//      chapati as whole pieces) until the whole day's totals are within:
+//        Calories ±30 kcal · Protein ±5g · Carbs ±10g · Fat ±5g
+//      of the target — recalculating on every step, exactly like a human
+//      nutritionist adjusting portions. No quantity is ever a value like
+//      "83g rice" — everything snaps to the step sizes defined per food.
+//   7. Every meal's displayed macros are the rounded SUM of its real food
+//      quantities, and calories are re-derived from those same rounded
+//      numbers (4/4/9 kcal/g) — so displayed calories always exactly
+//      match displayed protein/carbs/fat, with no separate override table
+//      that can drift out of sync.
 // ═══════════════════════════════════════════════════════════════════════════
 
-// ─── Weight brackets (order matters — first match wins) ───────────────────
+// ─── Weight brackets — used ONLY to label the plan (e.g. "61–70 kg") for
+// display purposes. They no longer drive the meal quantities themselves;
+// the solver below computes those directly from the person's real targets.
 const WEIGHT_BRACKETS = [
   { key: '40_50', min: 0,  max: 50,  label: '40–50 kg' },
   { key: '51_60', min: 51, max: 60,  label: '51–60 kg' },
   { key: '61_70', min: 61, max: 70,  label: '61–70 kg' },
-  { key: '71_80', min: 71, max: Infinity, label: '71–80 kg' },
+  { key: '71_80', min: 71, max: Infinity, label: '71–80 kg+' },
 ];
 
 function getBracket(weight) {
@@ -47,368 +53,273 @@ function getBracket(weight) {
   return WEIGHT_BRACKETS.find(b => w <= b.max) || WEIGHT_BRACKETS[WEIGHT_BRACKETS.length - 1];
 }
 
-// ─── Reference daily-target ranges by bracket (from your chart). These are
-// shown as a "target range for your weight" reference next to the ACTUAL
-// numbers computed from the real meal plan — they are informational only
-// and never override the real computed macros.
-const TARGET_RANGES = {
-  muscle_gain: {
-    '40_50': { calories: [2600, 2800], protein: [120, 140], carbs: [330, 360], fat: [65, 70] },
-    '51_60': { calories: [2900, 3100], protein: [145, 165], carbs: [380, 400], fat: [75, 85] },
-    '61_70': { calories: [3300, 3450], protein: [175, 185], carbs: [440, 450], fat: [85, 90] },
-    '71_80': { calories: [3500, 3700], protein: [185, 200], carbs: [470, 500], fat: [90, 100] },
-  },
-  // No reference chart was provided for fat_loss — omitted on purpose
-  // rather than guessing. Add the same shape here if/when you have one.
+// ─── Standard reference nutrition values (per 100g unless marked perUnit).
+// These are the ONLY nutrition numbers the engine is allowed to use — never
+// invented, never approximated at calculation time.
+//
+// Each food also defines:
+//   step  → the realistic increment the solver is allowed to move it by
+//   min   → smallest realistic quantity (0 if the food is optional in a meal)
+//   max   → largest realistic quantity
+//   unit  → display unit
+//   countable → true if it's a whole-number/piece item (uses perUnit math)
+//   nonvegOnly → true if it should only appear in non-veg plans
+const FOODS = {
+  rice:         { name: 'Rice (raw)',        per100: { cal: 365, p: 7.1, c: 80,  f: 0.7 }, step: 50, min: 50,  max: 350, unit: 'g' },
+  chicken:      { name: 'Chicken Breast',    per100: { cal: 165, p: 31,  c: 0,   f: 3.6 }, step: 50, min: 100, max: 300, unit: 'g', nonvegOnly: true },
+  paneer:       { name: 'Paneer',            per100: { cal: 265, p: 18,  c: 3,   f: 20  }, step: 50, min: 50,  max: 250, unit: 'g' },
+  oats:         { name: 'Oats',              per100: { cal: 389, p: 16.9,c: 66.3,f: 6.9 }, step: 10, min: 30,  max: 90,  unit: 'g' },
+  milk:         { name: 'Milk',              per100: { cal: 60,  p: 3.2, c: 4.8, f: 3.5 }, step: 50, min: 100, max: 350, unit: 'ml' },
+  curd:         { name: 'Curd',              per100: { cal: 61,  p: 3.5, c: 4.7, f: 3.3 }, step: 50, min: 50,  max: 300, unit: 'g' },
+  soyaChunks:   { name: 'Soya Chunks (dry)', per100: { cal: 345, p: 52,  c: 33,  f: 0.5 }, step: 10, min: 20,  max: 100, unit: 'g' },
+
+  egg:          { name: 'Whole Egg',   perUnit: { cal: 72, p: 6,   c: 0.6, f: 5   }, step: 1, min: 0, max: 6, unit: 'egg',       countable: true, nonvegOnly: true },
+  eggWhite:     { name: 'Egg White',   perUnit: { cal: 17, p: 3.6, c: 0.2, f: 0   }, step: 1, min: 0, max: 8, unit: 'egg white', countable: true, nonvegOnly: true },
+  banana:       { name: 'Banana',      perUnit: { cal: 89, p: 1.1, c: 23,  f: 0.3 }, step: 1, min: 0, max: 2, unit: 'medium',    countable: true },
+  apple:        { name: 'Apple',       perUnit: { cal: 52, p: 0.3, c: 14,  f: 0.2 }, step: 1, min: 0, max: 2, unit: 'medium',    countable: true },
+  chapati:      { name: 'Chapati',     perUnit: { cal: 120,p: 3.5, c: 24,  f: 2   }, step: 1, min: 1, max: 8, unit: 'medium',    countable: true },
+  // Peanut Butter: 1 tbsp ≈ 16g, derived from the per-100g reference value.
+  peanutButter: { name: 'Peanut Butter', perUnit: { cal: 588*0.16, p: 25*0.16, c: 20*0.16, f: 50*0.16 }, step: 1, min: 0, max: 4, unit: 'tbsp', countable: true },
+  // Almonds: 1 almond ≈ 1.2g, derived from the per-100g reference value.
+  almonds:      { name: 'Almonds', perUnit: { cal: 579*0.012, p: 21*0.012, c: 22*0.012, f: 50*0.012 }, step: 5, min: 0, max: 25, unit: 'pcs', countable: true },
 };
 
-// ─── Nutrition per 100g/100ml (gram-based) or per single unit (countable:
-// pc / plate / bowl / scoop / slice / tbsp).
-const NUTRITION = {
-  'Oats':                              { per100: { p: 16.9, c: 66.3, f: 6.9 } }, // Raw
-  'Rice':                              { per100: { p: 2.7,  c: 28.2, f: 0.3 } }, // Cooked White Rice
-  'Roti':                              { perUnit: { p: 3.2, c: 18.0, f: 1.2 } }, // 1 medium (35-40g)
-  'Brown Bread':                       { perUnit: { p: 3.5, c: 12.0, f: 1.1 } }, // 1 slice
-  'Boiled Potato/Sweet Potato':         { per100: { p: 1.9,  c: 20.1, f: 0.1 } },
-  'Banana':                            { perUnit: { p: 1.3, c: 27.0, f: 0.3 } }, // 1 medium
-  'Almonds':                           { perUnit: { p: 0.25, c: 0.26, f: 0.60 } }, // 1 almond (~1.2g)
-  'Peanut Butter':                     { perUnit: { p: 4.0,  c: 3.2,  f: 8.0  } }, // 1 tbsp (~16g)
-  'Soya Chunks':                       { per100: { p: 52.0, c: 33.0, f: 0.5 } }, // Dry
-  'Mixed Seeds':                       { per100: { p: 22.0, c: 18.0, f: 49.0 } },
-  'Upma / Poha':                       { per100: { p: 3.2,  c: 24.0, f: 4.2 } },
-  'Roasted Chana / Sprouts Moong Dal': { per100: { p: 20.0, c: 55.0, f: 5.0 } },
-  'Chicken':                           { per100: { p: 31.0, c: 0.0,  f: 3.6 } }, // Cooked Chicken Breast
-  'Eggs':                              { perUnit: { p: 6.3, c: 0.4,  f: 5.3 } }, // 1 large egg
-  'Paneer/Tofu':                       { per100: { p: 18.3, c: 1.2, f: 20.8 } },
-
-  // Fixed reference items
-  'Whey Protein':                      { perUnit: { p: 24.0, c: 3.0,  f: 1.5 } }, // 1 scoop (30g)
-  'Milk':                              { per100: { p: 3.3,  c: 4.8,  f: 3.3 } }, // Toned Milk
-  'Salad':                             { perUnit: { p: 2.0, c: 6.0,  f: 0.3 } }, // 1 plate
-  'Curd':                              { per100: { p: 3.5,  c: 4.7,  f: 3.3 } }, // per 100g
-  'Dal/Rajma':                         { perUnit: { p: 10.0,c: 28.0, f: 5.0 } }, // 1 bowl
-  'Mixed Vegetables':                  { perUnit: { p: 3.0, c: 10.0, f: 3.0 } }, // 1 bowl
-};
-
-function computeItemMacros(name, amount, isCountable) {
-  const entry = NUTRITION[name];
-  if (!entry) return { protein: 0, carbs: 0, fat: 0, calories: 0 };
-  const ref = isCountable ? entry.perUnit : (entry.per100 || entry.perUnit);
-  if (!ref) return { protein: 0, carbs: 0, fat: 0, calories: 0 };
-  const factor = isCountable ? amount : amount / 100;
-  const protein = ref.p * factor, carbs = ref.c * factor, fat = ref.f * factor;
-  const calories = protein * 4 + carbs * 4 + fat * 9;
-  return { protein, carbs, fat, calories };
+function computeFoodMacros(key, amount) {
+  const food = FOODS[key];
+  if (!food || !amount) return { cal: 0, p: 0, c: 0, f: 0 };
+  if (food.perUnit) {
+    return {
+      cal: food.perUnit.cal * amount,
+      p: food.perUnit.p * amount,
+      c: food.perUnit.c * amount,
+      f: food.perUnit.f * amount,
+    };
+  }
+  const factor = amount / 100;
+  return {
+    cal: food.per100.cal * factor,
+    p: food.per100.p * factor,
+    c: food.per100.c * factor,
+    f: food.per100.f * factor,
+  };
 }
 
-// ─── FIXED, PER-BRACKET meal plans ─────────────────────────────────────────
-// Every quantity here is EXACTLY what gets shown and used to compute
-// macros for that bracket. Nothing is scaled or solved at runtime — to
-// change a number, edit it directly below.
-const BASE_MEALS = {
+// ─── Meal templates: which food SLOTS make up each meal, per goal and diet
+// type. Every meal carries at least a protein source and a carb source (and
+// a fat source where appropriate), satisfying the "complete meal" rule. The
+// solver below decides the exact quantity of each slot.
+const MEAL_TEMPLATES = {
   muscle_gain: {
-    '40_50': [
-      { id: 'meal1', name: 'Pre-Workout', time: '7:00 AM', icon: '🌅', items: [
-        { name: 'Oats', unit: 'g', amount: 50 },
-        { name: 'Milk', unit: 'ml', amount: 250 },
-        { name: 'Banana', unit: 'medium', amount: 1, countable: true },
-        { name: 'Almonds', unit: 'pcs', amount: 8, countable: true },
-      ] },
-      { id: 'meal2', name: 'Post-Workout', time: '10:00 AM', icon: '💪', items: [
-        { name: 'Whey Protein', unit: 'scoop', amount: 1, countable: true },
-        { name: 'Brown Bread', unit: 'slices', amount: 3, countable: true },
-        { name: 'Peanut Butter', unit: 'tbsp', amount: 1, countable: true },
-        { name: 'Boiled Potato/Sweet Potato', unit: 'g', amount: 150 },
-      ] },
-      { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛', items: [
-        { name: 'Rice', unit: 'g', amount: 250, note: 'or 4 rotis' },
-        { name: 'Dal/Rajma', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Mixed Vegetables', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
-      ] },
-      { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜', items: [
-        { name: 'Soya Chunks', unit: 'g', amount: 40 },
-        { name: 'Curd', unit: 'g', amount: 200 },
-      ] },
-      { id: 'meal5', name: 'Dinner', time: '9:00 PM', icon: '🍲', items: [
-        { name: 'Paneer/Tofu', unit: 'g', amount: 150 },
-        { name: 'Roti', unit: 'medium', amount: 4, countable: true },
-        { name: 'Mixed Vegetables', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
-      ] },
+    veg: [
+      { name: 'Breakfast',    time: '7:00 AM',  icon: '🌅', slots: ['oats', 'milk', 'banana', 'almonds'] },
+      { name: 'Mid-Morning',  time: '10:00 AM', icon: '💪', slots: ['soyaChunks', 'chapati', 'peanutButter'] },
+      { name: 'Lunch',        time: '1:00 PM',  icon: '🍛', slots: ['rice', 'paneer', 'curd'] },
+      { name: 'Evening Snack',time: '5:00 PM',  icon: '🥜', slots: ['apple', 'almonds', 'curd'] },
+      { name: 'Dinner',       time: '9:00 PM',  icon: '🍲', slots: ['paneer', 'chapati', 'curd'] },
     ],
-    '51_60': [
-      { id: 'meal1', name: 'Pre-Workout', time: '7:00 AM', icon: '🌅', items: [
-        { name: 'Oats', unit: 'g', amount: 60 },
-        { name: 'Milk', unit: 'ml', amount: 250 },
-        { name: 'Banana', unit: 'medium', amount: 1, countable: true },
-        { name: 'Almonds', unit: 'pcs', amount: 10, countable: true },
-      ] },
-      { id: 'meal2', name: 'Post-Workout', time: '10:00 AM', icon: '💪', items: [
-        { name: 'Whey Protein', unit: 'scoop', amount: 1, countable: true },
-        { name: 'Brown Bread', unit: 'slices', amount: 4, countable: true },
-        { name: 'Peanut Butter', unit: 'tbsp', amount: 1, countable: true },
-        { name: 'Boiled Potato/Sweet Potato', unit: 'g', amount: 200 },
-      ] },
-      { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛', items: [
-        { name: 'Rice', unit: 'g', amount: 300, note: 'or 5 rotis' },
-        { name: 'Dal/Rajma', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Mixed Vegetables', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
-      ] },
-      { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜', items: [
-        { name: 'Soya Chunks', unit: 'g', amount: 50 },
-        { name: 'Curd', unit: 'g', amount: 200 },
-      ] },
-      { id: 'meal5', name: 'Dinner', time: '9:00 PM', icon: '🍲', items: [
-        { name: 'Paneer/Tofu', unit: 'g', amount: 200 },
-        { name: 'Roti', unit: 'medium', amount: 5, countable: true },
-        { name: 'Mixed Vegetables', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
-      ] },
-    ],
-    '61_70': [
-      { id: 'meal1', name: 'Pre-Workout', time: '7:00 AM', icon: '🌅', items: [
-        { name: 'Oats', unit: 'g', amount: 70 },
-        { name: 'Milk', unit: 'ml', amount: 250 },
-        { name: 'Banana', unit: 'medium', amount: 1, countable: true },
-        { name: 'Almonds', unit: 'pcs', amount: 10, countable: true },
-      ] },
-      { id: 'meal2', name: 'Post-Workout', time: '10:00 AM', icon: '💪', items: [
-        { name: 'Whey Protein', unit: 'scoop', amount: 1, countable: true },
-        { name: 'Brown Bread', unit: 'slices', amount: 4, countable: true },
-        { name: 'Peanut Butter', unit: 'tbsp', amount: 1, countable: true },
-        { name: 'Boiled Potato/Sweet Potato', unit: 'g', amount: 250 },
-      ] },
-      { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛', items: [
-        { name: 'Rice', unit: 'g', amount: 350, note: 'or 6 rotis' },
-        { name: 'Dal/Rajma', unit: 'bowl', amount: 1.5, countable: true },
-        { name: 'Mixed Vegetables', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
-      ] },
-      { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜', items: [
-        { name: 'Soya Chunks', unit: 'g', amount: 60 },
-        { name: 'Curd', unit: 'g', amount: 200 },
-      ] },
-      { id: 'meal5', name: 'Dinner', time: '9:00 PM', icon: '🍲', items: [
-        { name: 'Paneer/Tofu', unit: 'g', amount: 200 },
-        { name: 'Roti', unit: 'medium', amount: 6, countable: true },
-        { name: 'Mixed Vegetables', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
-      ] },
-    ],
-    '71_80': [
-      { id: 'meal1', name: 'Pre-Workout', time: '7:00 AM', icon: '🌅', items: [
-        { name: 'Oats', unit: 'g', amount: 80 },
-        { name: 'Milk', unit: 'ml', amount: 300 },
-        { name: 'Banana', unit: 'medium', amount: 2, countable: true },
-        { name: 'Almonds', unit: 'pcs', amount: 12, countable: true },
-      ] },
-      { id: 'meal2', name: 'Post-Workout', time: '10:00 AM', icon: '💪', items: [
-        { name: 'Whey Protein', unit: 'scoops', amount: 1.5, countable: true },
-        { name: 'Brown Bread', unit: 'slices', amount: 5, countable: true },
-        { name: 'Peanut Butter', unit: 'tbsp', amount: 1.5, countable: true },
-        { name: 'Boiled Potato/Sweet Potato', unit: 'g', amount: 300 },
-      ] },
-      { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛', items: [
-        { name: 'Rice', unit: 'g', amount: 400, note: 'or 7 rotis' },
-        { name: 'Dal/Rajma', unit: 'bowls', amount: 1.5, countable: true },
-        { name: 'Mixed Vegetables', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
-      ] },
-      { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜', items: [
-        { name: 'Soya Chunks', unit: 'g', amount: 70 },
-        { name: 'Curd', unit: 'g', amount: 250 },
-      ] },
-      { id: 'meal5', name: 'Dinner', time: '9:00 PM', icon: '🍲', items: [
-        { name: 'Paneer/Tofu', unit: 'g', amount: 250 },
-        { name: 'Roti', unit: 'medium', amount: 7, countable: true },
-        { name: 'Mixed Vegetables', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
-      ] },
+    nonveg: [
+      { name: 'Breakfast',    time: '7:00 AM',  icon: '🌅', slots: ['oats', 'milk', 'banana', 'almonds'] },
+      { name: 'Mid-Morning',  time: '10:00 AM', icon: '💪', slots: ['egg', 'chapati', 'peanutButter'] },
+      { name: 'Lunch',        time: '1:00 PM',  icon: '🍛', slots: ['rice', 'chicken', 'curd'] },
+      { name: 'Evening Snack',time: '5:00 PM',  icon: '🥜', slots: ['apple', 'almonds', 'curd'] },
+      { name: 'Dinner',       time: '9:00 PM',  icon: '🍲', slots: ['chicken', 'chapati', 'curd'] },
     ],
   },
-
-  // NOTE: no bracket-specific fat_loss chart was supplied. These brackets
-  // are extrapolated from the single fat_loss plan that existed before,
-  // scaled by roughly the same ratios as the muscle_gain brackets above.
-  // Replace any of these numbers directly once you have exact reference
-  // values — the structure (goal -> bracketKey -> meals[]) is identical.
   fat_loss: {
-    '40_50': [
-      { id: 'meal1', name: 'Pre-Workout', time: '6:30 AM', icon: '🌅', items: [
-        { name: 'Upma / Poha', unit: 'g', amount: 130 },
-        { name: 'Curd', unit: 'g', amount: 130 },
-      ] },
-      { id: 'meal2', name: 'Post-Workout', time: '8:00 AM', icon: '🥤', items: [
-        { name: 'Oats', unit: 'g', amount: 35 },
-        { name: 'Whey Protein', unit: 'scoop', amount: 1, countable: true },
-        { name: 'Milk', unit: 'ml', amount: 200 },
-        { name: 'Banana', unit: 'medium', amount: 1, countable: true },
-      ] },
-      { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛', items: [
-        { name: 'Rice', unit: 'g', amount: 170 },
-        { name: 'Dal/Rajma', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Soya Chunks', unit: 'g', amount: 25 },
-        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
-      ] },
-      { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜', items: [
-        { name: 'Roasted Chana / Sprouts Moong Dal', unit: 'g', amount: 35 },
-        { name: 'Curd', unit: 'g', amount: 130 },
-      ] },
-      { id: 'meal5', name: 'Dinner', time: '8:00 PM', icon: '🥣', items: [
-        { name: 'Paneer/Tofu', unit: 'g', amount: 80 },
-        { name: 'Roti', unit: 'medium', amount: 2, countable: true },
-        { name: 'Mixed Vegetables', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
-      ] },
+    veg: [
+      { name: 'Breakfast',    time: '6:30 AM',  icon: '🌅', slots: ['oats', 'milk', 'banana'] },
+      { name: 'Mid-Morning',  time: '8:30 AM',  icon: '🥤', slots: ['soyaChunks', 'chapati'] },
+      { name: 'Lunch',        time: '1:00 PM',  icon: '🍛', slots: ['rice', 'paneer', 'curd'] },
+      { name: 'Evening Snack',time: '5:00 PM',  icon: '🥜', slots: ['apple', 'almonds'] },
+      { name: 'Dinner',       time: '8:00 PM',  icon: '🥣', slots: ['paneer', 'chapati', 'curd'] },
     ],
-    '51_60': [
-      { id: 'meal1', name: 'Pre-Workout', time: '6:30 AM', icon: '🌅', items: [
-        { name: 'Upma / Poha', unit: 'g', amount: 150 },
-        { name: 'Curd', unit: 'g', amount: 150 },
-      ] },
-      { id: 'meal2', name: 'Post-Workout', time: '8:00 AM', icon: '🥤', items: [
-        { name: 'Oats', unit: 'g', amount: 40 },
-        { name: 'Whey Protein', unit: 'scoop', amount: 1, countable: true },
-        { name: 'Milk', unit: 'ml', amount: 250 },
-        { name: 'Banana', unit: 'medium', amount: 1, countable: true },
-      ] },
-      { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛', items: [
-        { name: 'Rice', unit: 'g', amount: 200 },
-        { name: 'Dal/Rajma', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Soya Chunks', unit: 'g', amount: 30 },
-        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
-      ] },
-      { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜', items: [
-        { name: 'Roasted Chana / Sprouts Moong Dal', unit: 'g', amount: 40 },
-        { name: 'Curd', unit: 'g', amount: 150 },
-      ] },
-      { id: 'meal5', name: 'Dinner', time: '8:00 PM', icon: '🥣', items: [
-        { name: 'Paneer/Tofu', unit: 'g', amount: 100 },
-        { name: 'Roti', unit: 'medium', amount: 3, countable: true },
-        { name: 'Mixed Vegetables', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
-      ] },
-    ],
-    '61_70': [
-      { id: 'meal1', name: 'Pre-Workout', time: '6:30 AM', icon: '🌅', items: [
-        { name: 'Upma / Poha', unit: 'g', amount: 170 },
-        { name: 'Curd', unit: 'g', amount: 170 },
-      ] },
-      { id: 'meal2', name: 'Post-Workout', time: '8:00 AM', icon: '🥤', items: [
-        { name: 'Oats', unit: 'g', amount: 45 },
-        { name: 'Whey Protein', unit: 'scoop', amount: 1, countable: true },
-        { name: 'Milk', unit: 'ml', amount: 250 },
-        { name: 'Banana', unit: 'medium', amount: 1, countable: true },
-      ] },
-      { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛', items: [
-        { name: 'Rice', unit: 'g', amount: 230 },
-        { name: 'Dal/Rajma', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Soya Chunks', unit: 'g', amount: 35 },
-        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
-      ] },
-      { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜', items: [
-        { name: 'Roasted Chana / Sprouts Moong Dal', unit: 'g', amount: 45 },
-        { name: 'Curd', unit: 'g', amount: 170 },
-      ] },
-      { id: 'meal5', name: 'Dinner', time: '8:00 PM', icon: '🥣', items: [
-        { name: 'Paneer/Tofu', unit: 'g', amount: 120 },
-        { name: 'Roti', unit: 'medium', amount: 4, countable: true },
-        { name: 'Mixed Vegetables', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
-      ] },
-    ],
-    '71_80': [
-      { id: 'meal1', name: 'Pre-Workout', time: '6:30 AM', icon: '🌅', items: [
-        { name: 'Upma / Poha', unit: 'g', amount: 190 },
-        { name: 'Curd', unit: 'g', amount: 190 },
-      ] },
-      { id: 'meal2', name: 'Post-Workout', time: '8:00 AM', icon: '🥤', items: [
-        { name: 'Oats', unit: 'g', amount: 50 },
-        { name: 'Whey Protein', unit: 'scoop', amount: 1, countable: true },
-        { name: 'Milk', unit: 'ml', amount: 300 },
-        { name: 'Banana', unit: 'medium', amount: 1, countable: true },
-      ] },
-      { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛', items: [
-        { name: 'Rice', unit: 'g', amount: 260 },
-        { name: 'Dal/Rajma', unit: 'bowl', amount: 1.5, countable: true },
-        { name: 'Soya Chunks', unit: 'g', amount: 40 },
-        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
-      ] },
-      { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜', items: [
-        { name: 'Roasted Chana / Sprouts Moong Dal', unit: 'g', amount: 50 },
-        { name: 'Curd', unit: 'g', amount: 190 },
-      ] },
-      { id: 'meal5', name: 'Dinner', time: '8:00 PM', icon: '🥣', items: [
-        { name: 'Paneer/Tofu', unit: 'g', amount: 140 },
-        { name: 'Roti', unit: 'medium', amount: 5, countable: true },
-        { name: 'Mixed Vegetables', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
-      ] },
+    nonveg: [
+      { name: 'Breakfast',    time: '6:30 AM',  icon: '🌅', slots: ['oats', 'milk', 'banana'] },
+      { name: 'Mid-Morning',  time: '8:30 AM',  icon: '🥤', slots: ['eggWhite', 'chapati'] },
+      { name: 'Lunch',        time: '1:00 PM',  icon: '🍛', slots: ['rice', 'chicken', 'curd'] },
+      { name: 'Evening Snack',time: '5:00 PM',  icon: '🥜', slots: ['apple', 'almonds'] },
+      { name: 'Dinner',       time: '8:00 PM',  icon: '🥣', slots: ['chicken', 'chapati', 'curd'] },
     ],
   },
 };
 
 // ─── Optional bonus meal — shown at the end, NOT counted toward the day's
-// calorie/protein/carb/fat totals (purely an "if you need more" add-on)
+// calorie/protein/carb/fat totals (purely an "if you need more" add-on).
 const OPTIONAL_MEALS = {
   muscle_gain: [
-    { id: 'optional1', name: 'Optional (If You Need More Calories)', time: 'Anytime', icon: '➕',
-      items: [
-        { name: 'Oats', unit: 'g', amount: 50 },
-        { name: 'Milk', unit: 'ml', amount: 250 },
-        { name: 'Mixed Seeds', unit: 'g', amount: 15 },
-      ] },
+    { name: 'Optional (If You Need More Calories)', time: 'Anytime', icon: '➕', slots: [
+      { key: 'oats', amount: 50 },
+      { key: 'milk', amount: 250 },
+      { key: 'almonds', amount: 10 },
+    ] },
   ],
 };
 
-// ─── THE ENGINE ────────────────────────────────────────────────────────────
-// Macros for every meal are computed by summing the real nutrition of its
-// exact fixed quantities. Protein/carbs/fat are rounded first, then
-// calories are derived from those SAME rounded numbers (4/4/9 kcal/g), so
-// a meal's displayed calories always exactly match its own displayed
-// protein/carbs/fat — no separate override table to keep in sync.
-function generateDietPlan(baseMeals) {
-  return baseMeals.map(meal => {
-    const items = meal.items.map(item => ({
-      ...item,
-      macros: computeItemMacros(item.name, item.amount, !!item.countable),
-    }));
+// ─── Target macro calculation ──────────────────────────────────────────────
+// Protein target: grams per kg bodyweight, goal-dependent (higher in a
+// deficit to preserve muscle). Fat target: percentage of total calories.
+// Carbs: whatever calories remain after protein and fat are accounted for.
+// Every number below is derived with a formula — nothing is a lookup table.
+const PROTEIN_PER_KG = { muscle_gain: 2.0, fat_loss: 2.2 };
+const FAT_PERCENT_OF_CALORIES = { muscle_gain: 0.25, fat_loss: 0.25 };
 
-    const raw = items.reduce((acc, it) => ({
-      protein: acc.protein + it.macros.protein,
-      carbs: acc.carbs + it.macros.carbs,
-      fat: acc.fat + it.macros.fat,
-    }), { protein: 0, carbs: 0, fat: 0 });
+function computeTargetMacros(goal, weightKg, targetCalories) {
+  const proteinPerKg = PROTEIN_PER_KG[goal] || 2.0;
+  const fatPercent = FAT_PERCENT_OF_CALORIES[goal] || 0.25;
 
-    const protein = Math.round(raw.protein);
-    const carbs = Math.round(raw.carbs);
-    const fat = Math.round(raw.fat);
-    const calories = Math.round(protein * 4 + carbs * 4 + fat * 9);
+  const protein = Math.round(weightKg * proteinPerKg);
+  const fat = Math.round((targetCalories * fatPercent) / 9);
+  const carbsCalories = Math.max(targetCalories - protein * 4 - fat * 9, 0);
+  const carbs = Math.round(carbsCalories / 4);
 
-    return { ...meal, items, macros: { protein, carbs, fat, calories } };
-  });
+  return { calories: targetCalories, protein, carbs, fat };
 }
 
-// ─── Optional bonus meal(s) — fixed reference amounts, never scaled, and
-// deliberately excluded from the totals above.
-function resolveOptionalMeals(goal) {
-  const meals = OPTIONAL_MEALS[goal] || [];
-  return meals.map(meal => {
-    const items = meal.items.map(item => ({
-      ...item, macros: computeItemMacros(item.name, item.amount, !!item.countable),
-    }));
+// ─── THE SOLVER ─────────────────────────────────────────────────────────────
+// Starts every food slot at its minimum realistic quantity, then repeatedly
+// looks for the single step (increase or decrease, on any slot) that moves
+// the day's totals closest to the target — recalculating totals from real
+// nutrition data after every step. Stops once Calories/Protein/Carbs/Fat are
+// all within tolerance, or once no further step can improve things.
+const TOLERANCE = { calories: 30, protein: 5, carbs: 10, fat: 5 };
+
+function withinTolerance(totals, target) {
+  return (
+    Math.abs(target.calories - totals.cal) <= TOLERANCE.calories &&
+    Math.abs(target.protein - totals.p) <= TOLERANCE.protein &&
+    Math.abs(target.carbs - totals.c) <= TOLERANCE.carbs &&
+    Math.abs(target.fat - totals.f) <= TOLERANCE.fat
+  );
+}
+
+function errorScore(totals, target) {
+  const dCal = (target.calories - totals.cal) / TOLERANCE.calories;
+  const dP = (target.protein - totals.p) / TOLERANCE.protein;
+  const dC = (target.carbs - totals.c) / TOLERANCE.carbs;
+  const dF = (target.fat - totals.f) / TOLERANCE.fat;
+  return dCal * dCal + dP * dP + dC * dC + dF * dF;
+}
+
+function solveMealPlan(goal, dietType, targetMacros) {
+  const templateSet = MEAL_TEMPLATES[goal] || MEAL_TEMPLATES.muscle_gain;
+  const template = templateSet[dietType] || templateSet.veg;
+
+  // Flatten every meal's slots into one list of {mealIdx, key} the solver
+  // can adjust independently.
+  const slots = [];
+  template.forEach((meal, mi) => {
+    meal.slots.forEach(key => slots.push({ mealIdx: mi, key }));
+  });
+
+  const qty = slots.map(s => FOODS[s.key].min);
+
+  function totals() {
+    let cal = 0, p = 0, c = 0, f = 0;
+    slots.forEach((s, i) => {
+      const m = computeFoodMacros(s.key, qty[i]);
+      cal += m.cal; p += m.p; c += m.c; f += m.f;
+    });
+    return { cal, p, c, f };
+  }
+
+  let current = totals();
+  const MAX_ITERATIONS = 600;
+
+  for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+    if (withinTolerance(current, targetMacros)) break;
+
+    let bestIdx = -1, bestDir = 0, bestScore = errorScore(current, targetMacros);
+
+    slots.forEach((s, i) => {
+      const food = FOODS[s.key];
+
+      // Try increasing this food by one realistic step.
+      if (qty[i] + food.step <= food.max) {
+        const d = computeFoodMacros(s.key, food.step);
+        const trial = { cal: current.cal + d.cal, p: current.p + d.p, c: current.c + d.c, f: current.f + d.f };
+        const score = errorScore(trial, targetMacros);
+        if (score < bestScore) { bestScore = score; bestIdx = i; bestDir = 1; }
+      }
+
+      // Try decreasing this food by one realistic step.
+      if (qty[i] - food.step >= food.min) {
+        const d = computeFoodMacros(s.key, -food.step);
+        const trial = { cal: current.cal + d.cal, p: current.p + d.p, c: current.c + d.c, f: current.f + d.f };
+        const score = errorScore(trial, targetMacros);
+        if (score < bestScore) { bestScore = score; bestIdx = i; bestDir = -1; }
+      }
+    });
+
+    if (bestIdx === -1) break; // no single step improves things further
+    qty[bestIdx] += bestDir * FOODS[slots[bestIdx].key].step;
+    current = totals();
+  }
+
+  // Build the display meal objects — quantities are exactly what the solver
+  // landed on, macros are the real sum of those quantities.
+  const meals = template.map((mealDef, mi) => {
+    const items = [];
+    slots.forEach((s, i) => {
+      if (s.mealIdx !== mi || qty[i] <= 0) return;
+      const food = FOODS[s.key];
+      const m = computeFoodMacros(s.key, qty[i]);
+      items.push({
+        name: food.name,
+        amount: qty[i],
+        unit: food.unit,
+        countable: !!food.countable,
+        macros: { protein: m.p, carbs: m.c, fat: m.f, calories: m.cal },
+      });
+    });
+
     const raw = items.reduce((acc, it) => ({
       protein: acc.protein + it.macros.protein,
       carbs: acc.carbs + it.macros.carbs,
       fat: acc.fat + it.macros.fat,
     }), { protein: 0, carbs: 0, fat: 0 });
+
     const protein = Math.round(raw.protein);
     const carbs = Math.round(raw.carbs);
     const fat = Math.round(raw.fat);
     const calories = Math.round(protein * 4 + carbs * 4 + fat * 9);
-    return { ...meal, items, macros: { protein, carbs, fat, calories } };
+
+    return {
+      id: `meal${mi + 1}`,
+      name: mealDef.name,
+      time: mealDef.time,
+      icon: mealDef.icon,
+      items,
+      macros: { protein, carbs, fat, calories },
+    };
+  });
+
+  const actualTotals = meals.reduce((acc, m) => ({
+    protein: acc.protein + m.macros.protein,
+    carbs: acc.carbs + m.macros.carbs,
+    fat: acc.fat + m.macros.fat,
+    calories: acc.calories + m.macros.calories,
+  }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
+
+  return { meals, actualTotals };
+}
+
+// ─── Optional bonus meal(s) — fixed reference amounts, never solved for,
+// and deliberately excluded from the day's totals.
+function resolveOptionalMeals(goal) {
+  const defs = OPTIONAL_MEALS[goal] || [];
+  return defs.map((meal, idx) => {
+    const items = meal.slots.map(({ key, amount }) => {
+      const food = FOODS[key];
+      const m = computeFoodMacros(key, amount);
+      return {
+        name: food.name,
+        amount,
+        unit: food.unit,
+        countable: !!food.countable,
+        macros: { protein: m.p, carbs: m.c, fat: m.f, calories: m.cal },
+      };
+    });
+    return { id: `optional${idx + 1}`, name: meal.name, time: meal.time, icon: meal.icon, items };
   });
 }
 
@@ -475,7 +386,7 @@ function generatePDF(meals, optionalMeals, userInfo, macros, targetCalories, act
   if (targetRange) {
     doc.setTextColor(120, 120, 120); doc.setFont('helvetica', 'italic'); doc.setFontSize(7);
     doc.text(
-      `Reference range for ${bracketLabel}: ${targetRange.calories[0]}-${targetRange.calories[1]} kcal, P ${targetRange.protein[0]}-${targetRange.protein[1]}g, C ${targetRange.carbs[0]}-${targetRange.carbs[1]}g, F ${targetRange.fat[0]}-${targetRange.fat[1]}g`,
+      `Target range: ${targetRange.calories[0]}-${targetRange.calories[1]} kcal, P ${targetRange.protein[0]}-${targetRange.protein[1]}g, C ${targetRange.carbs[0]}-${targetRange.carbs[1]}g, F ${targetRange.fat[0]}-${targetRange.fat[1]}g`,
       margin + 6, 226
     );
   }
@@ -753,7 +664,7 @@ function DynamicPlanView({ meals, optionalMeals, userInfo, macros, targetCalorie
           </p>
           {targetRange && (
             <p style={{color:'var(--text-secondary)', fontSize:'0.78rem', marginTop:'0.2rem', opacity:0.8}}>
-              Reference range for {bracketLabel}: {targetRange.calories[0]}–{targetRange.calories[1]} kcal · P {targetRange.protein[0]}–{targetRange.protein[1]}g · C {targetRange.carbs[0]}–{targetRange.carbs[1]}g · F {targetRange.fat[0]}–{targetRange.fat[1]}g
+              Target range: {targetRange.calories[0]}–{targetRange.calories[1]} kcal · P {targetRange.protein[0]}–{targetRange.protein[1]}g · C {targetRange.carbs[0]}–{targetRange.carbs[1]}g · F {targetRange.fat[0]}–{targetRange.fat[1]}g
             </p>
           )}
         </div>
@@ -894,9 +805,9 @@ export default function Diet() {
       const { weight, height, age, gender, activity, goal } = formData;
       const w = parseFloat(weight), h = parseFloat(height), a = parseInt(age);
 
-      // BMR (Mifflin-St Jeor) → TDEE → reference calorie target (shown for
-      // comparison only — the meal plan itself uses fixed, per-weight-bracket
-      // quantities, see BASE_MEALS above).
+      // BMR (Mifflin-St Jeor) → TDEE → target calories — unchanged from
+      // before. The meal plan itself is now solved mathematically to hit
+      // that target (see solveMealPlan / computeTargetMacros above).
       const bmr = gender === 'male' ? (10*w + 6.25*h - 5*a + 5) : (10*w + 6.25*h - 5*a - 161);
       const actMult = { sedentary:1.2, light:1.375, moderate:1.55, active:1.725, very_active:1.9 };
       const tdee = Math.round(bmr * (actMult[activity] || 1.55));
@@ -904,26 +815,25 @@ export default function Diet() {
       const FAT_LOSS_DEFICIT = 500;
       const targetCalories = goal === 'fat_loss' ? tdee - FAT_LOSS_DEFICIT : tdee + MUSCLE_GAIN_SURPLUS;
 
-      // Pick the weight bracket, then that bracket's FIXED meal plan for
-      // this goal — quantities never change once picked.
-      const bracket = getBracket(w);
-      const goalMeals = BASE_MEALS[goal] || BASE_MEALS.muscle_gain;
-      const baseMeals = goalMeals[bracket.key] || goalMeals['51_60'];
-      const scaledMeals = generateDietPlan(baseMeals);
+      // Derive target protein/carbs/fat mathematically from the calorie
+      // target, then solve real food quantities to land within tolerance
+      // of ALL four numbers at once.
+      const targetMacros = computeTargetMacros(goal, w, targetCalories);
 
-      // The ACTUAL macros/calories are the real sum of the fixed plan's
-      // foods for this bracket — this is what's shown as "Actual" and in
-      // the macro bar/PDF, guaranteed to always match the meal-by-meal
-      // breakdown exactly, since both come from the exact same numbers.
-      const actualTotals = scaledMeals.reduce((acc, m) => ({
-        protein: acc.protein + m.macros.protein,
-        carbs: acc.carbs + m.macros.carbs,
-        fat: acc.fat + m.macros.fat,
-        calories: acc.calories + m.macros.calories,
-      }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
+      // Respect the Non-Veg toggle at the engine level too, regardless of
+      // what's stored in the saved survey answers.
+      const effectiveDietType = NONVEG_DISABLED ? 'veg' : (formData.dietType === 'veg' ? 'veg' : 'nonveg');
 
+      const { meals: scaledMeals, actualTotals } = solveMealPlan(goal, effectiveDietType, targetMacros);
       const optionalMeals = resolveOptionalMeals(goal);
-      const targetRange = (TARGET_RANGES[goal] || {})[bracket.key] || null;
+
+      const bracket = getBracket(w);
+      const targetRange = {
+        calories: [targetMacros.calories - TOLERANCE.calories, targetMacros.calories + TOLERANCE.calories],
+        protein: [targetMacros.protein - TOLERANCE.protein, targetMacros.protein + TOLERANCE.protein],
+        carbs: [targetMacros.carbs - TOLERANCE.carbs, targetMacros.carbs + TOLERANCE.carbs],
+        fat: [targetMacros.fat - TOLERANCE.fat, targetMacros.fat + TOLERANCE.fat],
+      };
 
       const planData = {
         meals: scaledMeals,
@@ -1000,7 +910,7 @@ export default function Diet() {
               {activeTab === 'muscle_gain' ? 'Muscle Gain Plan' : 'Fat Loss Plan'}
             </h2>
             <p style={{color:'var(--text-secondary)', margin:'1rem 0 2rem', maxWidth:340, textAlign:'center', lineHeight:1.7}}>
-              Answer a few quick questions and we'll generate an exact meal plan matched to your weight bracket.
+              Answer a few quick questions and we'll generate an exact meal plan matched to your macros.
             </p>
             <button className="btn-primary" onClick={() => { setSurveyPlanType(activeTab); setShowSurvey(true); }}>
               ⚡ Start Survey
