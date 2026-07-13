@@ -163,7 +163,7 @@ const BASE_MEALS = {
     { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜',
       items: [
         { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 50, round: 5, min: 30 , max: 50 },
-        { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
+        { name: 'Curd', role: 'fixed', unit: 'g', amount: 200, countable: true },
       ] },
     { id: 'meal5', name: 'Dinner', time: '9:00 PM', icon: '🍲',
       items: [
@@ -196,7 +196,7 @@ const BASE_MEALS = {
     { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜',
       items: [
         { name: 'Roasted Chana / Sprouts Moong Dal', role: 'dynamic', unit: 'g', base: 40, round: 10 },
-        { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
+        { name: 'Curd', role: 'fixed', unit: 'g', amount: 200, countable: true },
       ] },
     { id: 'meal5', name: 'Dinner', time: '8:00 PM', icon: '🥣',
       items: [
