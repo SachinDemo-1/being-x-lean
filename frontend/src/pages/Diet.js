@@ -10,64 +10,54 @@ import './Diet.css';
 const NONVEG_DISABLED = true;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// DIET CALCULATION ENGINE — v6 (REDESIGNED)
+// DIET CALCULATION ENGINE — v8 (FIXED-QUANTITY + MACRO OVERRIDES)
 //
-// WHY THE OLD ENGINE KEPT BREAKING:
-// Previously, the macro numbers shown per meal (protein/carbs/fat/calories)
-// were RECOMPUTED from the actual food quantities assigned to that meal.
-// That meant any missing NUTRITION entry, any rounding pass, or any later
-// reshaping step (like carb ratios) could silently throw off the displayed
-// numbers — because the numbers depended on a long chain of food-solving
-// logic that was easy to break.
+// Every food quantity in BASE_MEALS below is a FIXED number, exactly as
+// specified — 60g Oats, 250ml Milk, 1 Banana, 10 Almonds, etc. Nothing is
+// scaled, guessed, or solved.
 //
-// NEW DESIGN — MACROS ARE THE SOURCE OF TRUTH, NOT THE FOODS:
-//  1. We compute the day's total target (calories/protein/carbs/fat) from
-//     the user's stats — exactly like before.
-//  2. We split that target across the day's 5 meals using a FIXED WEIGHT
-//     PROFILE per goal (MEAL_MACRO_WEIGHTS) — using largest-remainder
-//     rounding so the meals' numbers ALWAYS sum to EXACTLY the day's
-//     target, every single time, no matter what.
-//  3. Each meal's calories are always derived from THAT SAME meal's final
-//     protein/carbs/fat (4/4/9 kcal per gram) — so calories can never be
-//     inconsistent with the meal's own macros.
-//  4. ONLY AFTER the macros are locked in, we separately calculate
-//     realistic food quantities (grams/pieces) that approximate that
-//     meal's macro target, purely for display/shopping purposes. If a food
-//     name is ever missing from NUTRITION, it now only affects the
-//     suggested QUANTITY of that food — never the guaranteed-correct
-//     macro numbers shown for the meal.
+// MACRO OVERRIDES (new in v8):
+//   Some meals now carry an explicit `macroOverride: { protein, carbs, fat,
+//   calories }`. When present, that meal's displayed macros are taken
+//   EXACTLY from this object — the per-item NUTRITION math is skipped for
+//   totals. This exists because real reference diet plans (the numbers a
+//   coach/user gives you) are often not perfectly 4/4/9-kcal-consistent
+//   with a generic per-100g nutrition table (rounding, fiber, source
+//   differences, etc.) — trying to *derive* those exact numbers from a
+//   nutrition table will always be a few kcal/g off. An override removes
+//   that gap entirely: the number you specify is the number shown, with
+//   zero drift, every single time.
+//
+//   Meals WITHOUT a macroOverride still compute macros the old way: sum
+//   the real nutrition of their fixed quantities, round, then derive
+//   calories from the rounded numbers (4/4/9) so the meal's calories
+//   always match its own displayed protein/carbs/fat.
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ─── Nutrition per 100g/100ml (gram-based) or per single unit (countable:
-// pc / plate / bowl / scoop / slice / tbsp). Used only to compute realistic
-// FOOD QUANTITIES for display — never used to compute the macro numbers
-// shown for a meal (those come from MEAL_MACRO_WEIGHTS, see above).
+// pc / plate / bowl / scoop / slice / tbsp).
 const NUTRITION = {
   'Oats':                              { per100: { p: 16.9, c: 66.3, f: 6.9 } }, // Raw
   'Rice':                              { per100: { p: 2.7,  c: 28.2, f: 0.3 } }, // Cooked White Rice
-  'Fried Rice':                        { per100: { p: 4.2,  c: 28.0, f: 5.5 } },
   'Roti':                              { perUnit: { p: 3.2, c: 18.0, f: 1.2 } }, // 1 medium (35-40g)
   'Brown Bread':                       { perUnit: { p: 3.5, c: 12.0, f: 1.1 } }, // 1 slice
-  'Boiled Potato':                     { per100: { p: 1.9,  c: 20.1, f: 0.1 }, perUnit: { p: 2.85, c: 30.15, f: 0.15 } },
+  'Boiled Potato/Sweet Potato':         { per100: { p: 1.9,  c: 20.1, f: 0.1 } },
   'Banana':                            { perUnit: { p: 1.3, c: 27.0, f: 0.3 } }, // 1 medium
-  'Almonds':                           { per100: { p: 21.2, c: 21.7, f: 49.9 }, perUnit: { p: 0.25, c: 0.26, f: 0.60 } }, // 1 almond (~1.2g)
-  'Peanut Butter':                     { per100: { p: 25.0, c: 20.0, f: 50.0 }, perUnit: { p: 3.75, c: 3.0,  f: 7.5  } }, // 1 tbsp (~15g)
+  'Almonds':                           { perUnit: { p: 0.25, c: 0.26, f: 0.60 } }, // 1 almond (~1.2g)
+  'Peanut Butter':                     { perUnit: { p: 4.0,  c: 3.2,  f: 8.0  } }, // 1 tbsp (~16g)
   'Soya Chunks':                       { per100: { p: 52.0, c: 33.0, f: 0.5 } }, // Dry
   'Mixed Seeds':                       { per100: { p: 22.0, c: 18.0, f: 49.0 } },
   'Upma / Poha':                       { per100: { p: 3.2,  c: 24.0, f: 4.2 } },
   'Roasted Chana / Sprouts Moong Dal': { per100: { p: 20.0, c: 55.0, f: 5.0 } },
   'Chicken':                           { per100: { p: 31.0, c: 0.0,  f: 3.6 } }, // Cooked Chicken Breast
   'Eggs':                              { perUnit: { p: 6.3, c: 0.4,  f: 5.3 } }, // 1 large egg
-  'Boiled Potato/Sweet Patato':        { per100: { p: 1.9, c: 20.1, f: 0.1 }, perUnit: { p: 2.85, c: 30.15, f: 0.15 } },
-  'Rice/Roti':                         { per100: { p: 2.7, c: 28.2, f: 0.3 }, perUnit: { p: 3.2, c: 18.0, f: 1.2 } },
   'Paneer/Tofu':                       { per100: { p: 18.3, c: 1.2, f: 20.8 } },
 
-  // Fixed (never scale — quantity is always the same)
-  'Paneer':                            { per100: { p: 18.3, c: 1.2,  f: 20.8 } },
+  // Fixed reference items
   'Whey Protein':                      { perUnit: { p: 24.0, c: 3.0,  f: 1.5 } }, // 1 scoop (30g)
   'Milk':                              { per100: { p: 3.3,  c: 4.8,  f: 3.3 } }, // Toned Milk
   'Salad':                             { perUnit: { p: 2.0, c: 6.0,  f: 0.3 } }, // 1 plate
-  'Curd':                              { perUnit: { p: 6.0, c: 7.0,  f: 4.5 } }, // 1 bowl (~150g)
+  'Curd':                              { per100: { p: 3.5,  c: 4.7,  f: 3.3 } }, // per 100g
   'Dal/Rajma + Sabzi':                 { perUnit: { p: 10.0,c: 28.0, f: 5.0 } }, // 1 bowl
   'Mixed Vegetables':                  { perUnit: { p: 3.0, c: 10.0, f: 3.0 } }, // 1 bowl
 };
@@ -83,344 +73,156 @@ function computeItemMacros(name, amount, isCountable) {
   return { protein, carbs, fat, calories };
 }
 
-// Round a dynamic gram quantity to a realistic step (25g for bulk staples
-// like rice/potato, 10g for oats/bread-scale portions, 5g for small
-// toppings like nuts/peanut butter/seeds).
-function roundToStep(value, step) {
-  return Math.max(step, Math.round(value / step) * step);
-}
-
-// ─── Largest-remainder apportionment ──────────────────────────────────────
-// Rounds an array of real (float) values to integers so that they sum to
-// EXACTLY `total`, while keeping each value as close as possible to its
-// true amount. This is what guarantees per-meal numbers always add up to
-// the day's target with zero drift.
-function distributeIntegerWithRemainder(total, realValues) {
-  const floors = realValues.map(v => Math.floor(Math.max(0, v)));
-  let allocated = floors.reduce((a, b) => a + b, 0);
-  let remainder = total - allocated;
-  const result = [...floors];
-
-  if (remainder > 0) {
-    const order = realValues
-      .map((v, i) => ({ i, frac: v - floors[i] }))
-      .sort((a, b) => b.frac - a.frac);
-    for (let k = 0; k < remainder; k++) result[order[k % order.length].i] += 1;
-  } else if (remainder < 0) {
-    const order = realValues
-      .map((v, i) => ({ i, frac: v - floors[i] }))
-      .sort((a, b) => a.frac - b.frac);
-    for (let k = 0; k < Math.abs(remainder); k++) {
-      const idx = order[k % order.length].i;
-      result[idx] = Math.max(0, result[idx] - 1);
-    }
-  }
-  return result;
-}
-
-// Splits `total` across meals according to relative `weights` (any positive
-// numbers — they don't need to sum to anything specific, they're just
-// relative proportions), guaranteeing the split sums to EXACTLY `total`.
-function distributeByWeights(total, weights) {
-  const totalWeight = weights.reduce((a, b) => a + b, 0);
-  if (totalWeight <= 0) {
-    // Fallback: split evenly.
-    return distributeIntegerWithRemainder(total, weights.map(() => total / weights.length));
-  }
-  const real = weights.map(w => (w / totalWeight) * total);
-  return distributeIntegerWithRemainder(total, real);
-}
-
-// ─── MEAL MACRO WEIGHTS — the heart of the redesign ───────────────────────
-// These are the relative proportions of the day's protein/carbs/fat that
-// go to each meal, in meal order. They are RATIOS, not fixed grams — they
-// get scaled to whatever the user's actual daily target is, so the SAME
-// weights work correctly for a 50kg person or a 100kg person.
+// ─── FIXED meal plans — every quantity here is EXACTLY what gets shown and
+// used to compute macros. Nothing is scaled or solved. To change a
+// quantity, just change the `amount` below.
 //
-// The muscle_gain weights below are taken directly from the reference
-// example plan (a 60kg/170cm/25yr/active/veg user hitting 3200 kcal,
-// 184g protein, 411g carbs, 87g fat across 5 meals) — so for a very
-// similar user, the output will closely match that reference.
-const MEAL_MACRO_WEIGHTS = {
-  muscle_gain: {
-    // Pre-Workout, Post-Workout, Lunch, Evening, Dinner
-    protein: [22, 41, 28, 40, 53],
-    carbs:   [84, 82, 132, 26, 87],
-    fat:     [21, 13, 11, 10, 32],
-  },
-  fat_loss: {
-    // Pre-Workout, Post-Workout, Lunch, Evening, Dinner
-    protein: [15, 35, 25, 15, 40],
-    carbs:   [70, 50, 110, 25, 40],
-    fat:     [8, 12, 10, 8, 25],
-  },
-};
-
-// ─── Base meal plans — every item tagged role:'fixed'|'dynamic' ──────────────
-// These now ONLY control what FOOD QUANTITIES are suggested for display —
-// they no longer determine the macro numbers shown (those come from
-// MEAL_MACRO_WEIGHTS above). Fixed items: `amount` never changes. Dynamic
-// items: `base` is a starting reference weight for how much of the meal's
-// remaining (after fixed foods) each dynamic food should absorb.
+// `macroOverride` (when present) is the source of truth for that meal's
+// displayed Protein/Carbs/Fat/Calories — see the big comment block above
+// for why. Remove a meal's `macroOverride` if you want it to go back to
+// being calculated from the NUTRITION table instead.
 const BASE_MEALS = {
   muscle_gain: [
     { id: 'meal1', name: 'Pre-Workout', time: '7:00 AM', icon: '🌅',
+      macroOverride: { protein: 20, carbs: 71, fat: 18, calories: 530 },
       items: [
-        { name: 'Oats', role: 'dynamic', unit: 'g', base: 60, round: 5, min: 30, max: 80 },
-        { name: 'Milk', role: 'fixed', unit: 'ml', amount: 250 },
-        { name: 'Banana', role: 'fixed', unit: 'pc', amount: 1, countable: true },
-        { name: 'Almonds', role: 'fixed', unit: 'pc', amount: 10, countable: true },
+        { name: 'Oats', unit: 'g', amount: 60 },
+        { name: 'Milk', unit: 'ml', amount: 250 },
+        { name: 'Banana', unit: 'pc', amount: 1, countable: true },
+        { name: 'Almonds', unit: 'pc', amount: 10, countable: true },
       ] },
     { id: 'meal2', name: 'Post-Workout', time: '10:00 AM', icon: '💪',
+      macroOverride: { protein: 39, carbs: 75, fat: 12, calories: 595 },
       items: [
-        { name: 'Whey Protein', role: 'fixed', unit: 'scoop', amount: 1, countable: true },
-        { name: 'Brown Bread', role: 'fixed', unit: 'slice', amount: 4, countable: true },
-        { name: 'Peanut Butter', role: 'fixed', unit: 'tbsp', amount: 1, countable: true },
-        { name: 'Boiled Potato/Sweet Patato', role: 'dynamic', unit: 'g', base: 250, round: 25, min: 150, max: 300 },
+        { name: 'Whey Protein', unit: 'scoop', amount: 1, countable: true },
+        { name: 'Brown Bread', unit: 'slice', amount: 4, countable: true },
+        { name: 'Peanut Butter', unit: 'tbsp', amount: 1, countable: true },
+        { name: 'Boiled Potato/Sweet Potato', unit: 'g', amount: 200 },
       ] },
     { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
+      macroOverride: { protein: 22, carbs: 125, fat: 9, calories: 710 },
       items: [
-        { name: 'Rice/Roti', role: 'dynamic', unit: 'g', base: 350, round: 25, min: 200, max: 400 },
-        { name: 'Dal/Rajma + Sabzi', role: 'fixed', unit: 'bowl', amount: 1.5, countable: true },
-        { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
+        { name: 'Rice', unit: 'g', amount: 300 },
+        { name: 'Dal/Rajma + Sabzi', unit: 'bowl', amount: 1, countable: true },
+        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
       ] },
     { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜',
+      macroOverride: { protein: 36, carbs: 24, fat: 9, calories: 315 },
       items: [
-        { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 60, round: 5, min: 30, max: 70 },
-        { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
+        { name: 'Soya Chunks', unit: 'g', amount: 50 },
+        { name: 'Curd', unit: 'g', amount: 200 },
       ] },
     { id: 'meal5', name: 'Dinner', time: '9:00 PM', icon: '🍲',
+      macroOverride: { protein: 51, carbs: 93, fat: 38, calories: 930 },
       items: [
-        { name: 'Paneer/Tofu', role: 'fixed', unit: 'g', amount: 200 },
-        { name: 'Roti', role: 'dynamic', unit: 'pc', base: 6, countable: true, min: 3, max: 7 },
-        { name: 'Mixed Vegetables', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
+        { name: 'Paneer/Tofu', unit: 'g', amount: 200 },
+        { name: 'Roti', unit: 'pc', amount: 5, countable: true },
+        { name: 'Mixed Vegetables', unit: 'bowl', amount: 1, countable: true },
+        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
       ] },
   ],
   fat_loss: [
     { id: 'meal1', name: 'Pre-Workout', time: '6:30 AM', icon: '🌅',
       items: [
-        { name: 'Upma / Poha', role: 'dynamic', unit: 'g', base: 150, round: 10, min: 100, max: 200 },
-        { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
+        { name: 'Upma / Poha', unit: 'g', amount: 150 },
+        { name: 'Curd', unit: 'g', amount: 150 },
       ] },
     { id: 'meal2', name: 'Post-Workout', time: '8:00 AM', icon: '🥤',
       items: [
-        { name: 'Oats', role: 'dynamic', unit: 'g', base: 40, round: 5, min: 25, max: 50 },
-        { name: 'Whey Protein', role: 'fixed', unit: 'scoop', amount: 1, countable: true },
-        { name: 'Milk', role: 'fixed', unit: 'ml', amount: 250 },
-        { name: 'Banana', role: 'fixed', unit: 'pc', amount: 1, countable: true },
+        { name: 'Oats', unit: 'g', amount: 40 },
+        { name: 'Whey Protein', unit: 'scoop', amount: 1, countable: true },
+        { name: 'Milk', unit: 'ml', amount: 250 },
+        { name: 'Banana', unit: 'pc', amount: 1, countable: true },
       ] },
     { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
       items: [
-        { name: 'Rice/Roti', role: 'dynamic', unit: 'g', base: 200, round: 25, min: 150, max: 275 },
-        { name: 'Dal/Rajma + Sabzi', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 30, round: 5, min: 25, max: 45 },
-        { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
+        { name: 'Rice', unit: 'g', amount: 200 },
+        { name: 'Dal/Rajma + Sabzi', unit: 'bowl', amount: 1, countable: true },
+        { name: 'Soya Chunks', unit: 'g', amount: 30 },
+        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
       ] },
     { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜',
       items: [
-        { name: 'Roasted Chana / Sprouts Moong Dal', role: 'dynamic', unit: 'g', base: 40, round: 10, min: 25, max: 60 },
-        { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
+        { name: 'Roasted Chana / Sprouts Moong Dal', unit: 'g', amount: 40 },
+        { name: 'Curd', unit: 'g', amount: 150 },
       ] },
     { id: 'meal5', name: 'Dinner', time: '8:00 PM', icon: '🥣',
       items: [
-        { name: 'Paneer/Tofu', role: 'fixed', unit: 'g', amount: 100 },
-        { name: 'Rice/Roti', role: 'dynamic', unit: 'pc', base: 3, countable: true, min: 2, max: 4 },
-        { name: 'Mixed Vegetables', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
+        { name: 'Paneer/Tofu', unit: 'g', amount: 100 },
+        { name: 'Roti', unit: 'pc', amount: 3, countable: true },
+        { name: 'Mixed Vegetables', unit: 'bowl', amount: 1, countable: true },
+        { name: 'Salad', unit: 'plate', amount: 1, countable: true },
       ] },
   ],
 };
 
 // ─── Optional bonus meal — shown at the end, NOT counted toward the day's
-// calorie/protein/carb/fat target totals (purely an "if you need more" add-on)
+// calorie/protein/carb/fat totals (purely an "if you need more" add-on)
 const OPTIONAL_MEALS = {
   muscle_gain: [
     { id: 'optional1', name: 'Optional (If You Need More Calories)', time: 'Anytime', icon: '➕',
       items: [
-        { name: 'Oats', unit: 'g', amount: 40 },
+        { name: 'Oats', unit: 'g', amount: 50 },
         { name: 'Milk', unit: 'ml', amount: 250 },
         { name: 'Mixed Seeds', unit: 'g', amount: 15 },
       ] },
   ],
 };
 
-// ─── Per-meal food-quantity solver ─────────────────────────────────────────
-// Given ONE meal's template (fixed + dynamic items) and that meal's ALREADY
-// DECIDED macro target (protein/carbs/fat — the authoritative numbers from
-// MEAL_MACRO_WEIGHTS), work out realistic food quantities that approximate
-// it. This ONLY affects what quantities are displayed — it can never change
-// the macro numbers shown, because those are already fixed before this runs.
-function solveMealFoodQuantities(meal, mealTarget) {
-  const fixedItems = meal.items
-    .filter(it => it.role === 'fixed')
-    .map(it => ({ ...it, macros: computeItemMacros(it.name, it.amount, !!it.countable) }));
-
-  const fixedTotal = fixedItems.reduce((acc, it) => ({
-    protein: acc.protein + it.macros.protein,
-    carbs: acc.carbs + it.macros.carbs,
-    fat: acc.fat + it.macros.fat,
-  }), { protein: 0, carbs: 0, fat: 0 });
-
-  const remaining = {
-    protein: Math.max(0, mealTarget.protein - fixedTotal.protein),
-    carbs:   Math.max(0, mealTarget.carbs   - fixedTotal.carbs),
-    fat:     Math.max(0, mealTarget.fat     - fixedTotal.fat),
-  };
-
-  const dynamicItems = meal.items.filter(it => it.role === 'dynamic');
-
-  if (dynamicItems.length === 0) {
-    return fixedItems.sort((a, b) => meal.items.indexOf(a) - meal.items.indexOf(b));
-  }
-
-  const baseline = dynamicItems.map(it => computeItemMacros(it.name, it.base, !!it.countable));
-  const baseTotal = baseline.reduce((acc, m) => ({
-    protein: acc.protein + m.protein, carbs: acc.carbs + m.carbs, fat: acc.fat + m.fat,
-  }), { protein: 0, carbs: 0, fat: 0 });
-
-  const pScale = baseTotal.protein > 0 ? remaining.protein / baseTotal.protein : 1;
-  const cScale = baseTotal.carbs  > 0 ? remaining.carbs  / baseTotal.carbs  : 1;
-  const fScale = baseTotal.fat    > 0 ? remaining.fat    / baseTotal.fat    : 1;
-
-  let rawAmounts = dynamicItems.map((it, i) => {
-    const b = baseline[i];
-    const macroSum = b.protein + b.carbs + b.fat;
-    const scale = macroSum > 0 ? (b.protein * pScale + b.carbs * cScale + b.fat * fScale) / macroSum : 1;
-    return it.base * scale;
-  });
-
-  const density = dynamicItems.map(it => computeItemMacros(it.name, it.countable ? 1 : 100, !!it.countable));
-
-  // A handful of correction passes is plenty since each meal only has 1-2
-  // dynamic foods (unlike the old whole-day solver with dozens of items).
-  for (let pass = 0; pass < 6; pass++) {
-    ['protein', 'carbs', 'fat'].forEach(key => {
-      const current = dynamicItems.reduce((acc, it, i) => acc + computeItemMacros(it.name, rawAmounts[i], !!it.countable)[key], 0);
-      const gap = remaining[key] - current;
-      if (Math.abs(gap) < 0.01) return;
-
-      let anchorIdx = -1, maxShare = 0;
-      baseline.forEach((b, i) => { if (b[key] > maxShare) { maxShare = b[key]; anchorIdx = i; } });
-      if (anchorIdx === -1) return;
-
-      const perUnit = density[anchorIdx][key];
-      if (!perUnit || perUnit <= 0) return;
-      const unitsNeeded = dynamicItems[anchorIdx].countable ? (gap / perUnit) : (gap / perUnit) * 100;
-      rawAmounts[anchorIdx] = Math.max(0, rawAmounts[anchorIdx] + unitsNeeded);
-    });
-  }
-
-  const finalDynamic = dynamicItems.map((it, i) => {
-    let amount = it.countable
-      ? Math.max(1, Math.round(rawAmounts[i]))
-      : roundToStep(rawAmounts[i], it.round || 10);
-    if (it.min) amount = Math.max(amount, it.min);
-    if (it.max) amount = Math.min(amount, it.max);
-    return { ...it, amount, macros: computeItemMacros(it.name, amount, !!it.countable) };
-  });
-
-  // Rebuild in the meal's original item order.
-  return meal.items.map(item => {
-    if (item.role === 'fixed') return fixedItems.find(f => f.name === item.name && f.amount === item.amount);
-    return finalDynamic.find(d => d.name === item.name);
-  });
-}
-
 // ─── THE ENGINE ────────────────────────────────────────────────────────────
-// STEP 1 (done by the caller): BMR → TDEE → target calories/protein/carbs/fat.
-// STEP 2: split protein/carbs/fat across meals using MEAL_MACRO_WEIGHTS —
-//         guaranteed to sum EXACTLY to the day's target, always.
-// STEP 3: derive each meal's calories from ITS OWN final protein/carbs/fat
-//         (4/4/9 kcal/g) — always internally consistent.
-// STEP 4: solve realistic food quantities per meal for display — this can
-//         never affect the macro numbers from steps 2-3.
-function generateDietPlan(baseMeals, targetMacros, goal) {
-  const numMeals = baseMeals.length;
-  const weights = MEAL_MACRO_WEIGHTS[goal] || {
-    protein: Array(numMeals).fill(1),
-    carbs: Array(numMeals).fill(1),
-    fat: Array(numMeals).fill(1),
-  };
+// If a meal has a `macroOverride`, that object is used AS-IS for the
+// meal's displayed macros — guaranteed to match whatever you typed in
+// BASE_MEALS, with zero calculation drift.
+//
+// If a meal has NO override, its macros are computed by summing the real
+// nutrition of its exact fixed quantities. Protein/carbs/fat are rounded
+// first, then calories are derived from those SAME rounded numbers
+// (4/4/9 kcal/g), so a meal's displayed calories always exactly match its
+// own displayed protein/carbs/fat.
+function generateDietPlan(baseMeals) {
+  return baseMeals.map(meal => {
+    const items = meal.items.map(item => ({
+      ...item,
+      macros: computeItemMacros(item.name, item.amount, !!item.countable),
+    }));
 
-  // STEP 2 — exact split across meals.
-  const proteinAlloc = distributeByWeights(targetMacros.protein, weights.protein);
-  const carbsAlloc    = distributeByWeights(targetMacros.carbs,   weights.carbs);
-  const fatAlloc       = distributeByWeights(targetMacros.fat,     weights.fat);
+    if (meal.macroOverride) {
+      return { ...meal, items, macros: meal.macroOverride };
+    }
 
-  const scaledMeals = baseMeals.map((meal, mi) => {
-    const mealTarget = { protein: proteinAlloc[mi], carbs: carbsAlloc[mi], fat: fatAlloc[mi] };
+    const raw = items.reduce((acc, it) => ({
+      protein: acc.protein + it.macros.protein,
+      carbs: acc.carbs + it.macros.carbs,
+      fat: acc.fat + it.macros.fat,
+    }), { protein: 0, carbs: 0, fat: 0 });
 
-    // STEP 3 — calories always derived from this meal's OWN macros.
-    const calories = Math.round(mealTarget.protein * 4 + mealTarget.carbs * 4 + mealTarget.fat * 9);
+    const protein = Math.round(raw.protein);
+    const carbs = Math.round(raw.carbs);
+    const fat = Math.round(raw.fat);
+    const calories = Math.round(protein * 4 + carbs * 4 + fat * 9);
 
-    // STEP 4 — food quantities for display only.
-    const items = solveMealFoodQuantities(meal, mealTarget);
-
-    return {
-      ...meal,
-      items,
-      macros: {
-        protein: mealTarget.protein,
-        carbs: mealTarget.carbs,
-        fat: mealTarget.fat,
-        calories,
-      },
-    };
+    return { ...meal, items, macros: { protein, carbs, fat, calories } };
   });
-
-  return scaledMeals;
-}
-
-// ─── Validate that the meal breakdown actually adds up to the target ─────────
-// With the weight-based split, protein/carbs/fat sums are guaranteed exact
-// by construction — this remains as a safety-net sanity check only.
-function validateDietPlan(scaledMeals, targetMacros) {
-  const sum = scaledMeals.reduce((acc, m) => ({
-    protein: acc.protein + m.macros.protein,
-    carbs: acc.carbs + m.macros.carbs,
-    fat: acc.fat + m.macros.fat,
-    calories: acc.calories + m.macros.calories,
-  }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
-
-  const diffs = {
-    protein: sum.protein - targetMacros.protein,
-    carbs: sum.carbs - targetMacros.carbs,
-    fat: sum.fat - targetMacros.fat,
-    calories: sum.calories - targetMacros.calories,
-  };
-  const valid = diffs.protein === 0 && diffs.carbs === 0 && diffs.fat === 0;
-
-  if (!valid) {
-    console.warn('[Diet plan] Meal totals drifted from target:', diffs);
-  }
-  return { valid, sum, diffs };
 }
 
 // ─── Optional bonus meal(s) — fixed reference amounts, never scaled, and
-// deliberately excluded from the target totals above.
+// deliberately excluded from the totals above.
 function resolveOptionalMeals(goal) {
   const meals = OPTIONAL_MEALS[goal] || [];
   return meals.map(meal => {
     const items = meal.items.map(item => ({
       ...item, macros: computeItemMacros(item.name, item.amount, false),
     }));
-    const macros = items.reduce((acc, it) => ({
+    const raw = items.reduce((acc, it) => ({
       protein: acc.protein + it.macros.protein,
       carbs: acc.carbs + it.macros.carbs,
       fat: acc.fat + it.macros.fat,
-      calories: acc.calories + it.macros.calories,
-    }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
-    return {
-      ...meal,
-      items,
-      macros: {
-        protein: Math.round(macros.protein),
-        carbs: Math.round(macros.carbs),
-        fat: Math.round(macros.fat),
-        calories: Math.round(macros.calories),
-      },
-    };
+    }), { protein: 0, carbs: 0, fat: 0 });
+    const protein = Math.round(raw.protein);
+    const carbs = Math.round(raw.carbs);
+    const fat = Math.round(raw.fat);
+    const calories = Math.round(protein * 4 + carbs * 4 + fat * 9);
+    return { ...meal, items, macros: { protein, carbs, fat, calories } };
   });
 }
 
@@ -891,49 +693,41 @@ export default function Diet() {
       const { weight, height, age, gender, activity, goal } = formData;
       const w = parseFloat(weight), h = parseFloat(height), a = parseInt(age);
 
-      // 1. BMR (Mifflin-St Jeor) → TDEE → daily calorie target.
+      // BMR (Mifflin-St Jeor) → TDEE → reference calorie target (shown for
+      // comparison only — the meal plan itself uses fixed quantities, see
+      // BASE_MEALS above, so it no longer scales per user).
       const bmr = gender === 'male' ? (10*w + 6.25*h - 5*a + 5) : (10*w + 6.25*h - 5*a - 161);
       const actMult = { sedentary:1.2, light:1.375, moderate:1.55, active:1.725, very_active:1.9 };
       const tdee = Math.round(bmr * (actMult[activity] || 1.55));
-
-      // Tune these two constants to taste — they directly control how far
-      // above/below TDEE the daily calorie target sits.
-      const MUSCLE_GAIN_SURPLUS = 400; // kcal above TDEE for muscle gain
-      const FAT_LOSS_DEFICIT = 500;    // kcal below TDEE for fat loss
+      const MUSCLE_GAIN_SURPLUS = 400;
+      const FAT_LOSS_DEFICIT = 500;
       const targetCalories = goal === 'fat_loss' ? tdee - FAT_LOSS_DEFICIT : tdee + MUSCLE_GAIN_SURPLUS;
 
-      // 2. Macro targets — protein & fat driven directly by bodyweight,
-      //    carbs fill whatever calories are left using the REAL 4 kcal/g
-      //    conversion (not an arbitrary divisor) — this guarantees
-      //    protein*4 + fat*9 + carbs*4 === targetCalories, exactly, every
-      //    time, which is what makes every downstream number consistent.
-      const proteinG = Math.round(w * 2.2);
-      const fatG = Math.round(w * 1.0);
-      const remainingCal = targetCalories - (proteinG * 4) - (fatG * 9);
-      const carbsG = Math.round(remainingCal / 4);
-      const targetMacros = { protein: proteinG, carbs: carbsG, fat: fatG, calories: targetCalories };
-
-      // 3. Split the day's targets across meals using MEAL_MACRO_WEIGHTS —
-      //    guaranteed exact — then derive food quantities per meal.
+      // Build the FIXED meal plan for this goal — quantities never change.
       const baseMeals = BASE_MEALS[goal] || BASE_MEALS.muscle_gain;
-      const scaledMeals = generateDietPlan(baseMeals, targetMacros, goal);
+      const scaledMeals = generateDietPlan(baseMeals);
 
-      // 4. Sanity check (should always be exact for protein/carbs/fat).
-      validateDietPlan(scaledMeals, targetMacros);
+      // The ACTUAL macros/calories are the real sum of the fixed plan's
+      // foods (or the macroOverride values where present) — this is what's
+      // shown as "Actual" and in the macro bar/PDF, guaranteed to always
+      // match the meal-by-meal breakdown exactly, since both come from
+      // the exact same per-meal numbers.
+      const actualTotals = scaledMeals.reduce((acc, m) => ({
+        protein: acc.protein + m.macros.protein,
+        carbs: acc.carbs + m.macros.carbs,
+        fat: acc.fat + m.macros.fat,
+        calories: acc.calories + m.macros.calories,
+      }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
 
       const optionalMeals = resolveOptionalMeals(goal);
-
-      // The daily "actual calories" shown matches the same 4/4/9 rule used
-      // for every meal, so it always equals the sum of the per-meal values.
-      const actualCalories = targetMacros.protein * 4 + targetMacros.carbs * 4 + targetMacros.fat * 9;
 
       const planData = {
         meals: scaledMeals,
         optionalMeals,
         userInfo: formData,
-        macros: { protein: targetMacros.protein, carbs: targetMacros.carbs, fat: targetMacros.fat },
+        macros: { protein: actualTotals.protein, carbs: actualTotals.carbs, fat: actualTotals.fat },
         targetCalories,
-        actualCalories,
+        actualCalories: actualTotals.calories,
         tdee,
       };
       setPlanResult(planData);
