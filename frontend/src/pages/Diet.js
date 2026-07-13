@@ -91,7 +91,7 @@ const FOODS = {
   peanutButter: { name: 'Peanut Butter', perUnit: { cal: 96,  p: 4,    c: 3.2,  f: 8   }, step: 1,  min: 1,  max: 2,   unit: 'tbsp',    countable: true },
   boiledPotato: { name: 'Boiled Potato/Sweet Potato', per100: { cal: 87, p: 1.9, c: 20.1, f: 0.1 }, step: 50, min: 50, max: 350, unit: 'g' },
 
-  rice:         { name: 'Rice',          per100: { cal: 130, p: 2.7,  c: 28.2, f: 0.3 }, step: 50, min: 50,  max: 400, unit: 'g' },
+  rice:         { name: 'Rice',          per100: { cal: 130, p: 2.7,  c: 28.2, f: 0.3 }, step: 50, min: 150,  max: 400, unit: 'g' },
   dalRajma:     { name: 'Dal/Rajma',     perUnit: { cal: 172, p: 10,   c: 28,   f: 5   }, step: 1,  min: 1,  max: 1.5,   unit: 'bowl',    countable: true },
   mixedVeg:     { name: 'Mixed Vegetables', perUnit: { cal: 79, p: 3,  c: 10,   f: 3   }, step: 1,  min: 1,  max: 2,   unit: 'bowl',    countable: true },
   salad:        { name: 'Salad',         perUnit: { cal: 30,  p: 2,    c: 6,    f: 0.3 }, step: 1,  min: 1,  max: 2,   unit: 'plate',   countable: true },
