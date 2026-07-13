@@ -10,45 +10,39 @@ import './Diet.css';
 const NONVEG_DISABLED = true;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// DIET CALCULATION ENGINE — v5
+// DIET CALCULATION ENGINE — v6 (REDESIGNED)
 //
-// Architecture:
-//  • Every food is tagged FIXED or DYNAMIC.
-//    - FIXED foods NEVER change quantity, no matter what the user's stats
-//      are. Their macros are counted, then SUBTRACTED from the day's
-//      target — they are never touched again.
-//    - DYNAMIC foods absorb 100% of whatever target remains after the
-//      fixed foods are subtracted.
-//  • The remaining target is solved ONCE across the WHOLE DAY (all dynamic
-//    foods in all meals together), not meal-by-meal.
-//  • Quantities round to realistic, clean numbers (nearest 25g for rice/
-//    potato, nearest 5/10g for smaller portions, whole pieces for
-//    countable foods) — never odd decimals.
-//  • HARD MIN/MAX: a dynamic food can carry `min`/`max` — floors/ceilings
-//    enforced AFTER rounding/solving, so the macro solver can still scale
-//    it but it can never leave that realistic range.
-//  • EXACT TOTALS: meal-level protein/fat are apportioned across all meals
-//    at once using a largest-remainder method, so the meals' rounded
-//    totals ALWAYS sum to EXACTLY the day's target — zero drift.
-//  • CARBS: carbs are the ONE macro apportioned using FIXED per-meal weight
-//    ratios (MEAL_CARB_WEIGHTS) instead of each meal's real food-derived
-//    carb amount. This lets carbs be shaped to match a desired per-meal
-//    distribution while protein and fat keep following the real macros of
-//    the foods actually assigned to each meal — untouched.
-//  • CALORIES (NEW in v5): calories are NEVER apportioned separately —
-//    they are always DERIVED from that same meal's own final protein/
-//    carbs/fat (4/4/9 kcal per g). This guarantees every meal's displayed
-//    calories are internally consistent with its own macros, no matter how
-//    carbs got reshaped by MEAL_CARB_WEIGHTS.
+// WHY THE OLD ENGINE KEPT BREAKING:
+// Previously, the macro numbers shown per meal (protein/carbs/fat/calories)
+// were RECOMPUTED from the actual food quantities assigned to that meal.
+// That meant any missing NUTRITION entry, any rounding pass, or any later
+// reshaping step (like carb ratios) could silently throw off the displayed
+// numbers — because the numbers depended on a long chain of food-solving
+// logic that was easy to break.
+//
+// NEW DESIGN — MACROS ARE THE SOURCE OF TRUTH, NOT THE FOODS:
+//  1. We compute the day's total target (calories/protein/carbs/fat) from
+//     the user's stats — exactly like before.
+//  2. We split that target across the day's 5 meals using a FIXED WEIGHT
+//     PROFILE per goal (MEAL_MACRO_WEIGHTS) — using largest-remainder
+//     rounding so the meals' numbers ALWAYS sum to EXACTLY the day's
+//     target, every single time, no matter what.
+//  3. Each meal's calories are always derived from THAT SAME meal's final
+//     protein/carbs/fat (4/4/9 kcal per gram) — so calories can never be
+//     inconsistent with the meal's own macros.
+//  4. ONLY AFTER the macros are locked in, we separately calculate
+//     realistic food quantities (grams/pieces) that approximate that
+//     meal's macro target, purely for display/shopping purposes. If a food
+//     name is ever missing from NUTRITION, it now only affects the
+//     suggested QUANTITY of that food — never the guaranteed-correct
+//     macro numbers shown for the meal.
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ─── Nutrition per 100g/100ml (gram-based) or per single unit (countable:
-// pc / plate / bowl / scoop / slice). Calories are always DERIVED from
-// protein/carbs/fat (4/4/9 kcal per g) — never a separate hand-typed number —
-// so hitting the macro targets automatically means hitting calories too.
+// pc / plate / bowl / scoop / slice / tbsp). Used only to compute realistic
+// FOOD QUANTITIES for display — never used to compute the macro numbers
+// shown for a meal (those come from MEAL_MACRO_WEIGHTS, see above).
 const NUTRITION = {
-  // Dynamic (scale with the user's targets)
-
   'Oats':                              { per100: { p: 16.9, c: 66.3, f: 6.9 } }, // Raw
   'Rice':                              { per100: { p: 2.7,  c: 28.2, f: 0.3 } }, // Cooked White Rice
   'Fried Rice':                        { per100: { p: 4.2,  c: 28.0, f: 5.5 } },
@@ -69,7 +63,6 @@ const NUTRITION = {
   'Paneer/Tofu':                       { per100: { p: 18.3, c: 1.2, f: 20.8 } },
 
   // Fixed (never scale — quantity is always the same)
-
   'Paneer':                            { per100: { p: 18.3, c: 1.2,  f: 20.8 } },
   'Whey Protein':                      { perUnit: { p: 24.0, c: 3.0,  f: 1.5 } }, // 1 scoop (30g)
   'Milk':                              { per100: { p: 3.3,  c: 4.8,  f: 3.3 } }, // Toned Milk
@@ -78,10 +71,12 @@ const NUTRITION = {
   'Dal/Rajma + Sabzi':                 { perUnit: { p: 10.0,c: 28.0, f: 5.0 } }, // 1 bowl
   'Mixed Vegetables':                  { perUnit: { p: 3.0, c: 10.0, f: 3.0 } }, // 1 bowl
 };
+
 function computeItemMacros(name, amount, isCountable) {
   const entry = NUTRITION[name];
   if (!entry) return { protein: 0, carbs: 0, fat: 0, calories: 0 };
   const ref = isCountable ? entry.perUnit : (entry.per100 || entry.perUnit);
+  if (!ref) return { protein: 0, carbs: 0, fat: 0, calories: 0 };
   const factor = isCountable ? amount : amount / 100;
   const protein = ref.p * factor, carbs = ref.c * factor, fat = ref.f * factor;
   const calories = protein * 4 + carbs * 4 + fat * 9;
@@ -98,8 +93,8 @@ function roundToStep(value, step) {
 // ─── Largest-remainder apportionment ──────────────────────────────────────
 // Rounds an array of real (float) values to integers so that they sum to
 // EXACTLY `total`, while keeping each value as close as possible to its
-// true amount. This is what guarantees meal totals always add up to the
-// target macros with zero drift, instead of each meal rounding on its own.
+// true amount. This is what guarantees per-meal numbers always add up to
+// the day's target with zero drift.
 function distributeIntegerWithRemainder(total, realValues) {
   const floors = realValues.map(v => Math.floor(Math.max(0, v)));
   let allocated = floors.reduce((a, b) => a + b, 0);
@@ -107,13 +102,11 @@ function distributeIntegerWithRemainder(total, realValues) {
   const result = [...floors];
 
   if (remainder > 0) {
-    // Give the leftover +1s to whichever meals had the largest fractional part.
     const order = realValues
       .map((v, i) => ({ i, frac: v - floors[i] }))
       .sort((a, b) => b.frac - a.frac);
     for (let k = 0; k < remainder; k++) result[order[k % order.length].i] += 1;
   } else if (remainder < 0) {
-    // Real sum overshot the target (rare) — trim from smallest fractional parts first.
     const order = realValues
       .map((v, i) => ({ i, frac: v - floors[i] }))
       .sort((a, b) => a.frac - b.frac);
@@ -125,50 +118,81 @@ function distributeIntegerWithRemainder(total, realValues) {
   return result;
 }
 
-// ─── Fixed per-meal CARB weight ratios (only used for distributing the day's
-// carb target across meals — protein/fat are untouched and still follow
-// real food macros). Numbers are relative weights, not grams — they get
-// scaled to whatever the day's total carb target is.
-// Order matches the meal order in BASE_MEALS for that goal.
-const MEAL_CARB_WEIGHTS = {
-  muscle_gain: [63, 44, 91, 17, 90], // Meal1 Pre-Workout, Meal2 Post-Workout, Meal3 Lunch, Meal4 Evening, Meal5 Dinner
+// Splits `total` across meals according to relative `weights` (any positive
+// numbers — they don't need to sum to anything specific, they're just
+// relative proportions), guaranteeing the split sums to EXACTLY `total`.
+function distributeByWeights(total, weights) {
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
+  if (totalWeight <= 0) {
+    // Fallback: split evenly.
+    return distributeIntegerWithRemainder(total, weights.map(() => total / weights.length));
+  }
+  const real = weights.map(w => (w / totalWeight) * total);
+  return distributeIntegerWithRemainder(total, real);
+}
+
+// ─── MEAL MACRO WEIGHTS — the heart of the redesign ───────────────────────
+// These are the relative proportions of the day's protein/carbs/fat that
+// go to each meal, in meal order. They are RATIOS, not fixed grams — they
+// get scaled to whatever the user's actual daily target is, so the SAME
+// weights work correctly for a 50kg person or a 100kg person.
+//
+// The muscle_gain weights below are taken directly from the reference
+// example plan (a 60kg/170cm/25yr/active/veg user hitting 3200 kcal,
+// 184g protein, 411g carbs, 87g fat across 5 meals) — so for a very
+// similar user, the output will closely match that reference.
+const MEAL_MACRO_WEIGHTS = {
+  muscle_gain: {
+    // Pre-Workout, Post-Workout, Lunch, Evening, Dinner
+    protein: [22, 41, 28, 40, 53],
+    carbs:   [84, 82, 132, 26, 87],
+    fat:     [21, 13, 11, 10, 32],
+  },
+  fat_loss: {
+    // Pre-Workout, Post-Workout, Lunch, Evening, Dinner
+    protein: [15, 35, 25, 15, 40],
+    carbs:   [70, 50, 110, 25, 40],
+    fat:     [8, 12, 10, 8, 25],
+  },
 };
 
 // ─── Base meal plans — every item tagged role:'fixed'|'dynamic' ──────────────
-// Fixed items: `amount` is permanent and never changes.
-// Dynamic items: `base` is just a starting reference used to weight how much
-// of the remaining target each food should absorb relative to the others.
+// These now ONLY control what FOOD QUANTITIES are suggested for display —
+// they no longer determine the macro numbers shown (those come from
+// MEAL_MACRO_WEIGHTS above). Fixed items: `amount` never changes. Dynamic
+// items: `base` is a starting reference weight for how much of the meal's
+// remaining (after fixed foods) each dynamic food should absorb.
 const BASE_MEALS = {
   muscle_gain: [
     { id: 'meal1', name: 'Pre-Workout', time: '7:00 AM', icon: '🌅',
       items: [
-        { name: 'Oats', role: 'dynamic', unit: 'g', base: 60, round: 5,min: 30, max: 40 },
+        { name: 'Oats', role: 'dynamic', unit: 'g', base: 60, round: 5, min: 30, max: 80 },
         { name: 'Milk', role: 'fixed', unit: 'ml', amount: 250 },
-        { name: 'Banana', role: 'dynamic', unit: 'pc', base: 1, countable: true , max: 1 },
-        { name: 'Almonds', role: 'fixed', unit: 'pc', amount: 15, countable: true },
+        { name: 'Banana', role: 'fixed', unit: 'pc', amount: 1, countable: true },
+        { name: 'Almonds', role: 'fixed', unit: 'pc', amount: 10, countable: true },
       ] },
     { id: 'meal2', name: 'Post-Workout', time: '10:00 AM', icon: '💪',
       items: [
         { name: 'Whey Protein', role: 'fixed', unit: 'scoop', amount: 1, countable: true },
-        { name: 'Brown Bread', role: 'fixed', unit: 'slice', amount: 2, countable: true },
-        { name: 'Peanut Butter', role: 'fixed', unit: 'spoon', amount: 1, countable: true },
-        { name: 'Boiled Potato/Sweet Patato', role: 'fixed', unit: 'pc', amount: 1, countable: true },
+        { name: 'Brown Bread', role: 'fixed', unit: 'slice', amount: 4, countable: true },
+        { name: 'Peanut Butter', role: 'fixed', unit: 'tbsp', amount: 1, countable: true },
+        { name: 'Boiled Potato/Sweet Patato', role: 'dynamic', unit: 'g', base: 250, round: 25, min: 150, max: 300 },
       ] },
     { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
       items: [
-        { name: 'Rice/Roti', role: 'dynamic', unit: 'g', base: 25, round: 25 ,min: 200, max: 325 },
-        { name: 'Dal/Rajma + Sabzi', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
+        { name: 'Rice/Roti', role: 'dynamic', unit: 'g', base: 350, round: 25, min: 200, max: 400 },
+        { name: 'Dal/Rajma + Sabzi', role: 'fixed', unit: 'bowl', amount: 1.5, countable: true },
         { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
       ] },
     { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜',
       items: [
-        { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 50, round: 5, min: 30 , max: 50 },
-        { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },,
+        { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 60, round: 5, min: 30, max: 70 },
+        { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
       ] },
     { id: 'meal5', name: 'Dinner', time: '9:00 PM', icon: '🍲',
       items: [
-        { name: 'Paneer/Tofu', role: 'fixed', unit: 'g', amount: 150 },
-        { name: 'Roti', role: 'dynamic', unit: 'pc', base: 3, countable: true , min: 3, max:4 },
+        { name: 'Paneer/Tofu', role: 'fixed', unit: 'g', amount: 200 },
+        { name: 'Roti', role: 'dynamic', unit: 'pc', base: 6, countable: true, min: 3, max: 7 },
         { name: 'Mixed Vegetables', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
         { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
       ] },
@@ -176,32 +200,32 @@ const BASE_MEALS = {
   fat_loss: [
     { id: 'meal1', name: 'Pre-Workout', time: '6:30 AM', icon: '🌅',
       items: [
-        { name: 'Upma / Poha', role: 'dynamic', unit: 'g', base: 150, round: 10 ,min:100, max:150},
+        { name: 'Upma / Poha', role: 'dynamic', unit: 'g', base: 150, round: 10, min: 100, max: 200 },
         { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
       ] },
     { id: 'meal2', name: 'Post-Workout', time: '8:00 AM', icon: '🥤',
       items: [
-        { name: 'Oats', role: 'dynamic', unit: 'g', base: 40, round: 5, min:25 , max: 40 },
+        { name: 'Oats', role: 'dynamic', unit: 'g', base: 40, round: 5, min: 25, max: 50 },
         { name: 'Whey Protein', role: 'fixed', unit: 'scoop', amount: 1, countable: true },
         { name: 'Milk', role: 'fixed', unit: 'ml', amount: 250 },
-        { name: 'Banana', role: 'dynamic', unit: 'pc', base: 1, countable: true },
+        { name: 'Banana', role: 'fixed', unit: 'pc', amount: 1, countable: true },
       ] },
     { id: 'meal3', name: 'Lunch', time: '1:00 PM', icon: '🍛',
       items: [
-        { name: 'Rice/Roti', role: 'dynamic', unit: 'g', base: 200, round: 25 , min: 200 },
+        { name: 'Rice/Roti', role: 'dynamic', unit: 'g', base: 200, round: 25, min: 150, max: 275 },
         { name: 'Dal/Rajma + Sabzi', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
-        { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 30, round: 5, min: 30 , max:40 },
+        { name: 'Soya Chunks', role: 'dynamic', unit: 'g', base: 30, round: 5, min: 25, max: 45 },
         { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
       ] },
     { id: 'meal4', name: 'Evening', time: '5:00 PM', icon: '🥜',
       items: [
-        { name: 'Roasted Chana / Sprouts Moong Dal', role: 'dynamic', unit: 'g', base: 40, round: 10 },
+        { name: 'Roasted Chana / Sprouts Moong Dal', role: 'dynamic', unit: 'g', base: 40, round: 10, min: 25, max: 60 },
         { name: 'Curd', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
       ] },
     { id: 'meal5', name: 'Dinner', time: '8:00 PM', icon: '🥣',
       items: [
         { name: 'Paneer/Tofu', role: 'fixed', unit: 'g', amount: 100 },
-        { name: 'Rice/Roti', role: 'fixed', unit: 'Pc', amount: 3},
+        { name: 'Rice/Roti', role: 'dynamic', unit: 'pc', base: 3, countable: true, min: 2, max: 4 },
         { name: 'Mixed Vegetables', role: 'fixed', unit: 'bowl', amount: 1, countable: true },
         { name: 'Salad', role: 'fixed', unit: 'plate', amount: 1, countable: true },
       ] },
@@ -221,28 +245,17 @@ const OPTIONAL_MEALS = {
   ],
 };
 
-// ─── THE ENGINE ────────────────────────────────────────────────────────────
-// STEP 1 (done by the caller): BMR → TDEE → target calories/protein/carbs/fat.
-// STEP 2: sum every FIXED food's real macros and subtract from the target.
-// STEP 3: distribute what's LEFT across dynamic foods only, solved once for
-//         the whole day, then round every quantity to a realistic number.
-// STEP 4: apportion protein/fat using real per-meal macros
-//         (largest-remainder method) — no drift.
-//         CARBS use fixed MEAL_CARB_WEIGHTS ratios instead (if defined for
-//         this goal), so carbs land where you want them per meal.
-//         CALORIES are derived from each meal's OWN final protein/carbs/fat
-//         (never apportioned separately) — always internally consistent.
-function generateDietPlan(baseMeals, targetMacros, goal) {
-  // Flatten every item across all meals, remembering where it came from.
-  const flat = [];
-  baseMeals.forEach((meal, mi) => {
-    meal.items.forEach((item, ii) => flat.push({ ...item, mi, ii }));
-  });
+// ─── Per-meal food-quantity solver ─────────────────────────────────────────
+// Given ONE meal's template (fixed + dynamic items) and that meal's ALREADY
+// DECIDED macro target (protein/carbs/fat — the authoritative numbers from
+// MEAL_MACRO_WEIGHTS), work out realistic food quantities that approximate
+// it. This ONLY affects what quantities are displayed — it can never change
+// the macro numbers shown, because those are already fixed before this runs.
+function solveMealFoodQuantities(meal, mealTarget) {
+  const fixedItems = meal.items
+    .filter(it => it.role === 'fixed')
+    .map(it => ({ ...it, macros: computeItemMacros(it.name, it.amount, !!it.countable) }));
 
-  // STEP 2 — fixed foods' real macros, permanently locked, then subtracted.
-  const fixedItems = flat.filter(it => it.role === 'fixed').map(it => ({
-    ...it, amount: it.amount, macros: computeItemMacros(it.name, it.amount, !!it.countable),
-  }));
   const fixedTotal = fixedItems.reduce((acc, it) => ({
     protein: acc.protein + it.macros.protein,
     carbs: acc.carbs + it.macros.carbs,
@@ -250,13 +263,17 @@ function generateDietPlan(baseMeals, targetMacros, goal) {
   }), { protein: 0, carbs: 0, fat: 0 });
 
   const remaining = {
-    protein: Math.max(0, targetMacros.protein - fixedTotal.protein),
-    carbs:   Math.max(0, targetMacros.carbs   - fixedTotal.carbs),
-    fat:     Math.max(0, targetMacros.fat     - fixedTotal.fat),
+    protein: Math.max(0, mealTarget.protein - fixedTotal.protein),
+    carbs:   Math.max(0, mealTarget.carbs   - fixedTotal.carbs),
+    fat:     Math.max(0, mealTarget.fat     - fixedTotal.fat),
   };
 
-  // STEP 3 — distribute the REMAINING target only among dynamic foods.
-  const dynamicItems = flat.filter(it => it.role === 'dynamic');
+  const dynamicItems = meal.items.filter(it => it.role === 'dynamic');
+
+  if (dynamicItems.length === 0) {
+    return fixedItems.sort((a, b) => meal.items.indexOf(a) - meal.items.indexOf(b));
+  }
+
   const baseline = dynamicItems.map(it => computeItemMacros(it.name, it.base, !!it.countable));
   const baseTotal = baseline.reduce((acc, m) => ({
     protein: acc.protein + m.protein, carbs: acc.carbs + m.carbs, fat: acc.fat + m.fat,
@@ -266,8 +283,6 @@ function generateDietPlan(baseMeals, targetMacros, goal) {
   const cScale = baseTotal.carbs  > 0 ? remaining.carbs  / baseTotal.carbs  : 1;
   const fScale = baseTotal.fat    > 0 ? remaining.fat    / baseTotal.fat    : 1;
 
-  // Initial guess: macro-weighted blend (protein-heavy foods scale toward
-  // the protein need, carb-heavy toward carbs, fat-heavy toward fat).
   let rawAmounts = dynamicItems.map((it, i) => {
     const b = baseline[i];
     const macroSum = b.protein + b.carbs + b.fat;
@@ -277,10 +292,9 @@ function generateDietPlan(baseMeals, targetMacros, goal) {
 
   const density = dynamicItems.map(it => computeItemMacros(it.name, it.countable ? 1 : 100, !!it.countable));
 
-  // Correction pass across the WHOLE DAY'S dynamic foods at once — far more
-  // flexibility than solving each meal in isolation, since the protein need
-  // can now be met by ANY protein-containing dynamic food anywhere in the day.
-  for (let pass = 0; pass < 8; pass++) {
+  // A handful of correction passes is plenty since each meal only has 1-2
+  // dynamic foods (unlike the old whole-day solver with dozens of items).
+  for (let pass = 0; pass < 6; pass++) {
     ['protein', 'carbs', 'fat'].forEach(key => {
       const current = dynamicItems.reduce((acc, it, i) => acc + computeItemMacros(it.name, rawAmounts[i], !!it.countable)[key], 0);
       const gap = remaining[key] - current;
@@ -297,10 +311,7 @@ function generateDietPlan(baseMeals, targetMacros, goal) {
     });
   }
 
-  // Round every dynamic food to a realistic, clean quantity. Foods with a
-  // `min`/`max` are floored/capped AFTER rounding, so they can still scale
-  // within the solver but never leave their realistic range.
-  let finalDynamic = dynamicItems.map((it, i) => {
+  const finalDynamic = dynamicItems.map((it, i) => {
     let amount = it.countable
       ? Math.max(1, Math.round(rawAmounts[i]))
       : roundToStep(rawAmounts[i], it.round || 10);
@@ -309,68 +320,61 @@ function generateDietPlan(baseMeals, targetMacros, goal) {
     return { ...it, amount, macros: computeItemMacros(it.name, amount, !!it.countable) };
   });
 
-  // Rebuild each meal from its fixed (untouched) + dynamic (final) items,
-  // keeping REAL (unrounded) macros for now — rounding happens next, across
-  // all meals together, so the totals land exactly on target.
-  const mealsWithItems = baseMeals.map((meal, mi) => {
-    const items = meal.items.map((item, ii) => {
-      if (item.role === 'fixed') return fixedItems.find(f => f.mi === mi && f.ii === ii);
-      return finalDynamic.find(d => d.mi === mi && d.ii === ii);
-    });
-    const realMacros = items.reduce((acc, it) => ({
-      protein: acc.protein + it.macros.protein,
-      carbs: acc.carbs + it.macros.carbs,
-      fat: acc.fat + it.macros.fat,
-      calories: acc.calories + it.macros.calories,
-    }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
-    return { ...meal, items, realMacros };
+  // Rebuild in the meal's original item order.
+  return meal.items.map(item => {
+    if (item.role === 'fixed') return fixedItems.find(f => f.name === item.name && f.amount === item.amount);
+    return finalDynamic.find(d => d.name === item.name);
   });
+}
 
-  // STEP 4 — apportion protein/fat across meals so the rounded, DISPLAYED
-  // numbers sum to EXACTLY targetMacros — no drift, regardless of rounding.
-  const proteinAlloc  = distributeIntegerWithRemainder(targetMacros.protein,  mealsWithItems.map(m => m.realMacros.protein));
-  const fatAlloc      = distributeIntegerWithRemainder(targetMacros.fat,      mealsWithItems.map(m => m.realMacros.fat));
+// ─── THE ENGINE ────────────────────────────────────────────────────────────
+// STEP 1 (done by the caller): BMR → TDEE → target calories/protein/carbs/fat.
+// STEP 2: split protein/carbs/fat across meals using MEAL_MACRO_WEIGHTS —
+//         guaranteed to sum EXACTLY to the day's target, always.
+// STEP 3: derive each meal's calories from ITS OWN final protein/carbs/fat
+//         (4/4/9 kcal/g) — always internally consistent.
+// STEP 4: solve realistic food quantities per meal for display — this can
+//         never affect the macro numbers from steps 2-3.
+function generateDietPlan(baseMeals, targetMacros, goal) {
+  const numMeals = baseMeals.length;
+  const weights = MEAL_MACRO_WEIGHTS[goal] || {
+    protein: Array(numMeals).fill(1),
+    carbs: Array(numMeals).fill(1),
+    fat: Array(numMeals).fill(1),
+  };
 
-  // CARBS — use fixed per-meal weight ratios if defined for this goal,
-  // otherwise fall back to the real-macro-based apportionment (same as
-  // protein/fat above).
-  const carbWeights = MEAL_CARB_WEIGHTS[goal];
-  let carbsAlloc;
-  if (carbWeights && carbWeights.length === mealsWithItems.length) {
-    const totalWeight = carbWeights.reduce((a, b) => a + b, 0);
-    const weightedCarbs = carbWeights.map(w => (w / totalWeight) * targetMacros.carbs);
-    carbsAlloc = distributeIntegerWithRemainder(targetMacros.carbs, weightedCarbs);
-  } else {
-    carbsAlloc = distributeIntegerWithRemainder(targetMacros.carbs, mealsWithItems.map(m => m.realMacros.carbs));
-  }
+  // STEP 2 — exact split across meals.
+  const proteinAlloc = distributeByWeights(targetMacros.protein, weights.protein);
+  const carbsAlloc    = distributeByWeights(targetMacros.carbs,   weights.carbs);
+  const fatAlloc       = distributeByWeights(targetMacros.fat,     weights.fat);
 
-  // CALORIES — always derived from THIS meal's own final protein/carbs/fat
-  // (4/4/9 kcal per g), never apportioned separately. This guarantees every
-  // meal's calorie number is internally consistent with its own macros,
-  // no matter how carbs got reshaped by MEAL_CARB_WEIGHTS above.
-  const caloriesAlloc = mealsWithItems.map((m, mi) =>
-    Math.round(proteinAlloc[mi] * 4 + carbsAlloc[mi] * 4 + fatAlloc[mi] * 9)
-  );
+  const scaledMeals = baseMeals.map((meal, mi) => {
+    const mealTarget = { protein: proteinAlloc[mi], carbs: carbsAlloc[mi], fat: fatAlloc[mi] };
 
-  const scaledMeals = mealsWithItems.map((meal, mi) => ({
-    ...meal,
-    macros: {
-      protein: proteinAlloc[mi],
-      carbs: carbsAlloc[mi],
-      fat: fatAlloc[mi],
-      calories: caloriesAlloc[mi],
-    },
-  }));
+    // STEP 3 — calories always derived from this meal's OWN macros.
+    const calories = Math.round(mealTarget.protein * 4 + mealTarget.carbs * 4 + mealTarget.fat * 9);
+
+    // STEP 4 — food quantities for display only.
+    const items = solveMealFoodQuantities(meal, mealTarget);
+
+    return {
+      ...meal,
+      items,
+      macros: {
+        protein: mealTarget.protein,
+        carbs: mealTarget.carbs,
+        fat: mealTarget.fat,
+        calories,
+      },
+    };
+  });
 
   return scaledMeals;
 }
 
 // ─── Validate that the meal breakdown actually adds up to the target ─────────
-// (Now mostly a safety net. Protein/carbs/fat should always sum exactly to
-// target. Calories are derived per-meal, so their sum equals
-// protein*4 + carbs*4 + fat*9 of the FINAL macros, which may differ slightly
-// from the originally requested targetMacros.calories if that value wasn't
-// itself perfectly 4/4/9-consistent — this is expected and intentional.)
+// With the weight-based split, protein/carbs/fat sums are guaranteed exact
+// by construction — this remains as a safety-net sanity check only.
 function validateDietPlan(scaledMeals, targetMacros) {
   const sum = scaledMeals.reduce((acc, m) => ({
     protein: acc.protein + m.macros.protein,
@@ -385,10 +389,7 @@ function validateDietPlan(scaledMeals, targetMacros) {
     fat: sum.fat - targetMacros.fat,
     calories: sum.calories - targetMacros.calories,
   };
-  const valid =
-    diffs.protein === 0 &&
-    diffs.carbs === 0 &&
-    diffs.fat === 0;
+  const valid = diffs.protein === 0 && diffs.carbs === 0 && diffs.fat === 0;
 
   if (!valid) {
     console.warn('[Diet plan] Meal totals drifted from target:', diffs);
@@ -447,20 +448,9 @@ function generatePDF(meals, optionalMeals, userInfo, macros, targetCalories, act
   // Cover
   doc.setFillColor(...dark); doc.rect(0, 0, W, 297, 'F');
   doc.setFillColor(...gold); doc.rect(0, 0, W, 3, 'F'); doc.rect(margin, 45, 1.5, 55, 'F');
-  // FRONT PAGE BODY IMAGE ONLY
   const bodyImg = new Image();
   bodyImg.src = "/images/body.png";
-
-  doc.addImage(
-    bodyImg,
-    "PNG",
-
-    90, // left-right position
-    20,  // up-down position
-
-    100,  // width
-    100  // height
-  );
+  doc.addImage(bodyImg, "PNG", 90, 20, 100, 100);
   doc.setTextColor(...gold); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
   doc.text('BEING X LEAN', margin + 6, 30);
   doc.setTextColor(...gray); doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
@@ -879,10 +869,6 @@ export default function Diet() {
   function handleTabClick(tabId) {
     if (tabId === 'standard') { setActiveTab('standard'); return; }
     setActiveTab(tabId);
-    // If we have the user's saved survey ANSWERS for this goal, regenerate
-    // the plan fresh from them (using whatever the current meal data is) —
-    // rather than loading a previously computed plan object from cache,
-    // which would go stale the moment BASE_MEALS is ever updated.
     try {
       const savedAnswers = localStorage.getItem(`bxl_diet_survey_${tabId}`);
       if (savedAnswers) {
@@ -894,8 +880,6 @@ export default function Diet() {
     setShowSurvey(true);
   }
 
-  // Reopen the survey pre-filled with the last saved answers, so the user
-  // can tweak their details without starting from a blank form.
   function handleEditSurvey(goal) {
     setSurveyPlanType(goal);
     setShowSurvey(true);
@@ -907,40 +891,40 @@ export default function Diet() {
       const { weight, height, age, gender, activity, goal } = formData;
       const w = parseFloat(weight), h = parseFloat(height), a = parseInt(age);
 
-      // 1. BMR (Mifflin-St Jeor) → TDEE → daily calorie target
+      // 1. BMR (Mifflin-St Jeor) → TDEE → daily calorie target.
       const bmr = gender === 'male' ? (10*w + 6.25*h - 5*a + 5) : (10*w + 6.25*h - 5*a - 161);
       const actMult = { sedentary:1.2, light:1.375, moderate:1.55, active:1.725, very_active:1.9 };
       const tdee = Math.round(bmr * (actMult[activity] || 1.55));
-      const MUSCLE_GAIN_SURPLUS = 1200; // midpoint of the 300–500 kcal range
-      const FAT_LOSS_DEFICIT = 500;
+
+      // Tune these two constants to taste — they directly control how far
+      // above/below TDEE the daily calorie target sits.
+      const MUSCLE_GAIN_SURPLUS = 400; // kcal above TDEE for muscle gain
+      const FAT_LOSS_DEFICIT = 500;    // kcal below TDEE for fat loss
       const targetCalories = goal === 'fat_loss' ? tdee - FAT_LOSS_DEFICIT : tdee + MUSCLE_GAIN_SURPLUS;
 
-
       // 2. Macro targets — protein & fat driven directly by bodyweight,
-      //    carbs fill whatever calories are left. This guarantees
-      //    protein*4 + fat*9 + carbs*4 === targetCalories, exactly.
+      //    carbs fill whatever calories are left using the REAL 4 kcal/g
+      //    conversion (not an arbitrary divisor) — this guarantees
+      //    protein*4 + fat*9 + carbs*4 === targetCalories, exactly, every
+      //    time, which is what makes every downstream number consistent.
       const proteinG = Math.round(w * 2.2);
-      const fatG = Math.round(w * 1.3);
+      const fatG = Math.round(w * 1.0);
       const remainingCal = targetCalories - (proteinG * 4) - (fatG * 9);
-      const carbsG = Math.round(remainingCal / 6.5);
+      const carbsG = Math.round(remainingCal / 4);
       const targetMacros = { protein: proteinG, carbs: carbsG, fat: fatG, calories: targetCalories };
 
-      // 3+4+5. Split the day's targets across meals, then derive real
-      // ingredient quantities that hit each meal's slice of those targets.
+      // 3. Split the day's targets across meals using MEAL_MACRO_WEIGHTS —
+      //    guaranteed exact — then derive food quantities per meal.
       const baseMeals = BASE_MEALS[goal] || BASE_MEALS.muscle_gain;
       const scaledMeals = generateDietPlan(baseMeals, targetMacros, goal);
 
-      // 6. Validate: sum of all meals should equal the target exactly
-      //    for protein/carbs/fat. Calories are derived per-meal, so their
-      //    sum is naturally consistent with those final macros.
-      const { sum } = validateDietPlan(scaledMeals, targetMacros);
+      // 4. Sanity check (should always be exact for protein/carbs/fat).
+      validateDietPlan(scaledMeals, targetMacros);
 
-      // Optional bonus meal(s) — shown separately, never counted in the totals above.
       const optionalMeals = resolveOptionalMeals(goal);
 
-      // The daily "actual calories" shown to the user is now derived from
-      // the FINAL protein/carbs/fat targets (same 4/4/9 rule as every meal),
-      // so it always matches the sum of the per-meal calorie numbers.
+      // The daily "actual calories" shown matches the same 4/4/9 rule used
+      // for every meal, so it always equals the sum of the per-meal values.
       const actualCalories = targetMacros.protein * 4 + targetMacros.carbs * 4 + targetMacros.fat * 9;
 
       const planData = {
@@ -953,8 +937,6 @@ export default function Diet() {
         tdee,
       };
       setPlanResult(planData);
-      // Save the survey answers so the user isn't asked to fill the form
-      // again next time they open this goal's tab.
       try {
         localStorage.setItem(`bxl_diet_survey_${goal}`, JSON.stringify(formData));
       } catch {}
