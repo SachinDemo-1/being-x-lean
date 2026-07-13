@@ -97,7 +97,7 @@ const FOODS = {
   salad:        { name: 'Salad',         perUnit: { cal: 30,  p: 2,    c: 6,    f: 0.3 }, step: 1,  min: 1,  max: 2,   unit: 'plate',   countable: true },
 
   soyaChunks:   { name: 'Soya Chunks',   per100: { cal: 345, p: 52,   c: 33,   f: 0.5 }, step: 10, min: 40,  max: 60, unit: 'g' },
-  curd:         { name: 'Curd',          per100: { cal: 61,  p: 3.5,  c: 4.7,  f: 3.3 }, step: 50, min: 50,  max: 250, unit: 'g' },
+  curd:         { name: 'Curd',          per100: { cal: 61,  p: 3.5,  c: 4.7,  f: 3.3 }, step: 50, min: 100,  max: 250, unit: 'g' },
 
   paneerTofu:   { name: 'Paneer/Tofu',   per100: { cal: 265, p: 18.3, c: 1.2,  f: 20.8 }, step: 50, min: 50, max: 150, unit: 'g' },
   roti:         { name: 'Roti',          perUnit: { cal: 120, p: 3.2, c: 18,   f: 1.2 }, step: 1,  min: 1,  max: 5,   unit: 'medium',  countable: true },
