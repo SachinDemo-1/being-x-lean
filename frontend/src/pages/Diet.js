@@ -915,6 +915,7 @@ export default function Diet() {
       const FAT_LOSS_DEFICIT = 500;
       const targetCalories = goal === 'fat_loss' ? tdee - FAT_LOSS_DEFICIT : tdee + MUSCLE_GAIN_SURPLUS;
 
+      
       // 2. Macro targets — protein & fat driven directly by bodyweight,
       //    carbs fill whatever calories are left. This guarantees
       //    protein*4 + fat*9 + carbs*4 === targetCalories, exactly.
