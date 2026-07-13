@@ -83,24 +83,24 @@ const TARGET_RANGES = {
 const FOODS = {
   oats:         { name: 'Oats',                              per100: { cal: 389, p: 16.9, c: 66.3, f: 6.9 }, step: 10, min: 30,  max: 90,  unit: 'g' },
   milk:         { name: 'Milk',                               per100: { cal: 60,  p: 3.3,  c: 4.8,  f: 3.3 }, step: 50, min: 100, max: 350, unit: 'ml' },
-  banana:       { name: 'Banana',        perUnit: { cal: 89,  p: 1.3,  c: 27,   f: 0.3 }, step: 1,  min: 0,  max: 2,   unit: 'medium', countable: true },
-  almonds:      { name: 'Almonds',       perUnit: { cal: 6.9, p: 0.25, c: 0.26, f: 0.60 }, step: 5, min: 0,  max: 25,  unit: 'pcs',     countable: true },
+  banana:       { name: 'Banana',        perUnit: { cal: 89,  p: 1.3,  c: 27,   f: 0.3 }, step: 1,  min: 1,  max: 2,   unit: 'medium', countable: true },
+  almonds:      { name: 'Almonds',       perUnit: { cal: 6.9, p: 0.25, c: 0.26, f: 0.60 }, step: 5, min: 10,  max: 25,  unit: 'pcs',     countable: true },
 
-  wheyProtein:  { name: 'Whey Protein',  perUnit: { cal: 118, p: 24,   c: 3,    f: 1.5 }, step: 1,  min: 0,  max: 2,   unit: 'scoop',   countable: true },
-  brownBread:   { name: 'Brown Bread',   perUnit: { cal: 70,  p: 3.5,  c: 12,   f: 1.1 }, step: 1,  min: 0,  max: 6,   unit: 'slice',   countable: true },
-  peanutButter: { name: 'Peanut Butter', perUnit: { cal: 96,  p: 4,    c: 3.2,  f: 8   }, step: 1,  min: 0,  max: 3,   unit: 'tbsp',    countable: true },
+  wheyProtein:  { name: 'Whey Protein',  perUnit: { cal: 118, p: 24,   c: 3,    f: 1.5 }, step: 1,  min: 1,  max: 2,   unit: 'scoop',   countable: true },
+  brownBread:   { name: 'Brown Bread',   perUnit: { cal: 70,  p: 3.5,  c: 12,   f: 1.1 }, step: 1,  min: 2,  max: 6,   unit: 'slice',   countable: true },
+  peanutButter: { name: 'Peanut Butter', perUnit: { cal: 96,  p: 4,    c: 3.2,  f: 8   }, step: 1,  min: 1,  max: 2,   unit: 'tbsp',    countable: true },
   boiledPotato: { name: 'Boiled Potato/Sweet Potato', per100: { cal: 87, p: 1.9, c: 20.1, f: 0.1 }, step: 50, min: 50, max: 350, unit: 'g' },
 
   rice:         { name: 'Rice',          per100: { cal: 130, p: 2.7,  c: 28.2, f: 0.3 }, step: 50, min: 50,  max: 400, unit: 'g' },
-  dalRajma:     { name: 'Dal/Rajma',     perUnit: { cal: 172, p: 10,   c: 28,   f: 5   }, step: 1,  min: 1,  max: 2,   unit: 'bowl',    countable: true },
+  dalRajma:     { name: 'Dal/Rajma',     perUnit: { cal: 172, p: 10,   c: 28,   f: 5   }, step: 1,  min: 1,  max: 1.5,   unit: 'bowl',    countable: true },
   mixedVeg:     { name: 'Mixed Vegetables', perUnit: { cal: 79, p: 3,  c: 10,   f: 3   }, step: 1,  min: 1,  max: 2,   unit: 'bowl',    countable: true },
   salad:        { name: 'Salad',         perUnit: { cal: 30,  p: 2,    c: 6,    f: 0.3 }, step: 1,  min: 1,  max: 2,   unit: 'plate',   countable: true },
 
-  soyaChunks:   { name: 'Soya Chunks',   per100: { cal: 345, p: 52,   c: 33,   f: 0.5 }, step: 10, min: 20,  max: 100, unit: 'g' },
+  soyaChunks:   { name: 'Soya Chunks',   per100: { cal: 345, p: 52,   c: 33,   f: 0.5 }, step: 10, min: 40,  max: 60, unit: 'g' },
   curd:         { name: 'Curd',          per100: { cal: 61,  p: 3.5,  c: 4.7,  f: 3.3 }, step: 50, min: 50,  max: 250, unit: 'g' },
 
-  paneerTofu:   { name: 'Paneer/Tofu',   per100: { cal: 265, p: 18.3, c: 1.2,  f: 20.8 }, step: 50, min: 50, max: 250, unit: 'g' },
-  roti:         { name: 'Roti',          perUnit: { cal: 120, p: 3.2, c: 18,   f: 1.2 }, step: 1,  min: 1,  max: 8,   unit: 'medium',  countable: true },
+  paneerTofu:   { name: 'Paneer/Tofu',   per100: { cal: 265, p: 18.3, c: 1.2,  f: 20.8 }, step: 50, min: 50, max: 150, unit: 'g' },
+  roti:         { name: 'Roti',          perUnit: { cal: 120, p: 3.2, c: 18,   f: 1.2 }, step: 1,  min: 1,  max: 5,   unit: 'medium',  countable: true },
 
   upmaPoha:     { name: 'Upma / Poha',   per100: { cal: 150, p: 3.2,  c: 24,   f: 4.2 }, step: 10, min: 50,  max: 250, unit: 'g' },
   roastedChana: { name: 'Roasted Chana / Sprouted Moong Dal', per100: { cal: 340, p: 20, c: 55, f: 5 }, step: 10, min: 20, max: 100, unit: 'g' },
