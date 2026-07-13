@@ -911,7 +911,7 @@ export default function Diet() {
       const bmr = gender === 'male' ? (10*w + 6.25*h - 5*a + 5) : (10*w + 6.25*h - 5*a - 161);
       const actMult = { sedentary:1.2, light:1.375, moderate:1.55, active:1.725, very_active:1.9 };
       const tdee = Math.round(bmr * (actMult[activity] || 1.55));
-      const MUSCLE_GAIN_SURPLUS = 1000; // midpoint of the 300–500 kcal range
+      const MUSCLE_GAIN_SURPLUS = 1200; // midpoint of the 300–500 kcal range
       const FAT_LOSS_DEFICIT = 500;
       const targetCalories = goal === 'fat_loss' ? tdee - FAT_LOSS_DEFICIT : tdee + MUSCLE_GAIN_SURPLUS;
 
