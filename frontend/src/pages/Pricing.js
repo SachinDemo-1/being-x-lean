@@ -51,7 +51,7 @@ const PLANS = [
     title: 'BUY',
     subtitle: 'DIET PLAN',
     originalPrice: 500,
-    price: 199, // ← change me
+    price: 149, // ← change me
     color: '#39ff14',
     features: ['Personalized Diet Plan', 'Meal Plan (Veg/Non-Veg)', 'Calorie & Macronutrient Guide', 'Healthy & Effective Nutrition'],
     razorpayLink: 'https://rzp.io/l/diet-plan',
@@ -99,7 +99,7 @@ export default function Pricing() {
       try {
         const updatedUser = await grantPlan(plan.unlocks);
         setUser(updatedUser);
-        alert(`✅ ${plan.subtitle} unlocked (test mode). Opening your plan…`);
+        alert(`✅ ${plan.subtitle} unlocked. Opening your plan…`);
         navigate(plan.goTo);
       } catch (e) {
         alert('Something went wrong unlocking your plan. Please try again.');
