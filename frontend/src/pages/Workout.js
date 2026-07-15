@@ -377,7 +377,15 @@ export default function Workout() {
   };
 
   if (authLoading) return null;
-  if (!user || !hasPlan(user, 'workout')) return null;
+  if (!user || !hasPlan(user, 'workout')) {
+    return (
+      <SEO
+        title="Best Workout Plans in India — 4, 5 & 6 Day PPL Splits"
+        description="Elite Push Pull Legs workout plans for 4, 5 and 6 days a week, with animated exercise demos and form tips."
+        path="/workout"
+      />
+    );
+  }
 
   return (
     <div className="workout-page">
