@@ -315,7 +315,7 @@ export default function Workout() {
   useEffect(() => {
     if (!unlocked) return;
     if (!shouldShowReviewPopup(user)) return;
-    const timer = setTimeout(() => setShowReviewPopup(true), 45000); // 45s after unlock
+    const timer = setTimeout(() => setShowReviewPopup(true), 10000); // 45s after unlock
     return () => clearTimeout(timer);
   }, [unlocked, user]);
 

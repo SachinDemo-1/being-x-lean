@@ -802,7 +802,7 @@ export default function Diet() {
   useEffect(() => {
     if (!unlocked) return;
     if (!shouldShowReviewPopup(user)) return;
-    const timer = setTimeout(() => setShowReviewPopup(true), 45000);
+    const timer = setTimeout(() => setShowReviewPopup(true), 10000);
     return () => clearTimeout(timer);
   }, [unlocked, user]);
 
