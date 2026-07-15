@@ -420,6 +420,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <ReviewsSection />
       {/* ── IMAGE GALLERY ── */}
       <ImageGallery
         images={GALLERY_IMAGES}
