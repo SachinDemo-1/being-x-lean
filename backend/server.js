@@ -7,7 +7,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/user.js';
 import './middleware/passport.js';
-
+import reviewRoutes from './routes/reviews.js';
 dotenv.config();
 import dns from 'dns';
 dns.setServers(["1.1.1.1" , "8.8.8.8"]);
@@ -58,6 +58,7 @@ mongoose.connect(process.env.MONGODB_URI)
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'FitPPL API running 💪' }));
 

@@ -7,7 +7,8 @@ import './Home.css';
 import beingxleanimg from '../assets/gifs/beingxleanimg.png';
 import ImageGallery from './ImageGallery';
 import './ImageGallery.css';
-
+import SEO, { buildOrganizationSchema, buildWebsiteSchema, buildBreadcrumbSchema, buildFAQSchema } from '../components/SEO';
+import ReviewsSection from '../components/ReviewsSection';
 // ─── MUSCLE COLORS ────────────────────────────────────────────────────────────
 const MC = {
   chest:'#e8516a', pec_minor:'#c94060', shoulder:'#e8874a', delt_ant:'#d4763a',
@@ -35,7 +36,11 @@ const GALLERY_IMAGES = [
   { url: '/images/being9.PNG', label: 'Bᴇɪɴɢ_Ӽ_ʟᴇᴀɴ', tag: '' },
   { url: '/images/being10.jpeg', label: 'Bᴇɪɴɢ_Ӽ_ʟᴇᴀɴ', tag: '' },
 ];
-
+const HOME_FAQS = [
+  { question: 'What does BEING_X_LEAN offer?', answer: 'BEING_X_LEAN offers structured Push Pull Legs workout plans (4, 5 and 6 days a week), personalized Indian diet plans built around your calories and macros, and a progress tracker — all in one platform.' },
+  { question: 'Is BEING_X_LEAN free to use?', answer: 'Yes, you can create a free account to explore workout and diet plans. Some advanced plans unlock as you engage with the platform.' },
+  { question: 'Who is BEING_X_LEAN for?', answer: 'Beginners, intermediate and advanced lifters in India who want a clear, science-backed training and nutrition system without guesswork.' },
+];
 // ─── FRONT BODY SVG ──────────────────────────────────────────────────────────
 function FrontBody({ onHover, onClickMuscle, hoveredGroup, clickedGroup }) {
   const isH = (g) => hoveredGroup === g || clickedGroup === g;
@@ -373,6 +378,17 @@ export default function Home() {
 
   return (
     <div className="home">
+      <SEO
+        title="BEING_X_LEAN — Best Workout & Diet Plans in India"
+        description="Elite Push Pull Legs workout plans and personalized Indian diet plans, engineered for peak performance."
+        path="/"
+        schemas={[
+          buildOrganizationSchema(),
+          buildWebsiteSchema(),
+          buildBreadcrumbSchema([{ name: 'Home', path: '/' }]),
+          buildFAQSchema(HOME_FAQS),
+        ]}
+      />
       <div className="noise-overlay" />
 
       {/* ── HERO ── */}
@@ -479,6 +495,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+
+      <ReviewsSection />
 
       {/* ── FOOTER ── */}
       <footer className="footer">

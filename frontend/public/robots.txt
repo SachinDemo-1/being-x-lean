@@ -1,8 +1,11 @@
+# https://beingxlean.com robots.txt
 User-agent: *
 Allow: /
-Disallow: /profile
-Disallow: /tracker
+
+# Don't waste crawl budget on account/auth pages with no unique public content
 Disallow: /auth
 Disallow: /auth/success
+Disallow: /profile
+Disallow: /tracker
 
-Sitemap: https://www.beingxlean.com/sitemap.xml
+Sitemap: https://beingxlean.com/sitemap.xml

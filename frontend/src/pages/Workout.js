@@ -37,6 +37,10 @@ import reversepecdec1 from '../assets/gifs/reversepecdec1.gif';
 import oneArmTricepPushDown from '../assets/gifs/oneArmTricepPushDown.gif';
 
 
+import SEO, { buildBreadcrumbSchema, buildFAQSchema, buildSoftwareApplicationSchema } from '../components/SEO';
+import ReviewPopup from '../components/ReviewPopup';
+import { shouldShowReviewPopup, markPrompted } from '../context/reviews';
+
 // ── Exercise GIF URLs ──────────────────────────────────────────────────────────
 // Using free-exercise-db (public domain) images from GitHub CDN
 // These are static JPG exercise demonstration images that load reliably
@@ -305,6 +309,16 @@ export default function Workout() {
     if (!hasPlan(user, 'workout')) { navigate('/pricing?for=workout', { replace: true }); return; }
   }, [user, authLoading, navigate]);
 
+  const [showReviewPopup, setShowReviewPopup] = useState(false);
+  const unlocked = !!user && hasPlan(user, 'workout');
+
+  useEffect(() => {
+    if (!unlocked) return;
+    if (!shouldShowReviewPopup(user)) return;
+    const timer = setTimeout(() => setShowReviewPopup(true), 45000); // 45s after unlock
+    return () => clearTimeout(timer);
+  }, [unlocked, user]);
+
   const plan = workoutPlans[selectedDays];
   
   const activeSchedule = (selectedDays === 6 && sixDayLevel === 'advanced' && plan.advancedSchedule)
@@ -463,6 +477,13 @@ export default function Workout() {
           ))}
         </div>
       </div>
+
+      {showReviewPopup && (
+        <ReviewPopup
+          plan="workout"
+          onClose={() => { markPrompted(user); setShowReviewPopup(false); }}
+        />
+      )}
     </div>
   );
 }

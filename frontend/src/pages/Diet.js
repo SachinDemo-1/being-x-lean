@@ -5,6 +5,10 @@ import { useAuth } from '../context/AuthContext';
 import { hasPlan } from '../context/purchases';
 import './Diet.css';
 
+import SEO, { buildBreadcrumbSchema, buildFAQSchema, buildSoftwareApplicationSchema } from '../components/SEO';
+import ReviewPopup from '../components/ReviewPopup';
+import { shouldShowReviewPopup, markPrompted } from '../context/reviews';
+
 // ─── Temporary toggle: set to true to disable Non-Veg selection (e.g. during
 // festival/holiday days). Flip back to false to re-enable it.
 const NONVEG_DISABLED = true;
@@ -792,6 +796,16 @@ export default function Diet() {
     if (!hasPlan(user, 'diet')) { navigate('/pricing?for=diet', { replace: true }); return; }
   }, [user, authLoading, navigate]);
 
+  const [showReviewPopup, setShowReviewPopup] = useState(false);
+  const unlocked = !!user && hasPlan(user, 'diet');
+
+  useEffect(() => {
+    if (!unlocked) return;
+    if (!shouldShowReviewPopup(user)) return;
+    const timer = setTimeout(() => setShowReviewPopup(true), 45000);
+    return () => clearTimeout(timer);
+  }, [unlocked, user]);
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); }),
@@ -952,6 +966,12 @@ export default function Diet() {
               return saved ? JSON.parse(saved) : null;
             } catch { return null; }
           })()}
+        />
+      )}
+      {showReviewPopup && (
+        <ReviewPopup
+          plan="diet"
+          onClose={() => { markPrompted(user); setShowReviewPopup(false); }}
         />
       )}
     </div>
