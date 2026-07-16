@@ -30,7 +30,9 @@ export default function Navbar() {
     <nav className={`navbar ${scrolled ? 'scrolled' : ''}`}>
       <div className="nav-inner">
         <Link to="/" className="nav-logo" onClick={close}>
-          <img className='logo-icon' src='/images/beingxlean.jpg' alt='logo' />
+          <div className="logo-glow-wrap">
+            <img className='logo-icon' src='/images/beingxlean.jpg' alt='BEING_X_LEAN logo' width="40" height="40" decoding="async" />
+          </div>
           <span className="logo-text">BEING<span className="logo-accent">_X_</span>LEAN</span>
         </Link>
 
