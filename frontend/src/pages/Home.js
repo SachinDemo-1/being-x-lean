@@ -499,8 +499,6 @@ export default function Home() {
       </section>
 
 
-      <ReviewsSection />
-
       {/* ── FOOTER ── */}
       <footer className="footer">
         <div className="footer-inner">
