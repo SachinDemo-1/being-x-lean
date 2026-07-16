@@ -491,7 +491,7 @@ export default function Home() {
           <div className="cta-box reveal">
             <div className="cta-orb"></div>
             <h3 className="section-title"><div className='brand-x'>BEING_X_LEAN</div></h3>
-            <div className="logo-glow-wrap">
+            <div className="cta-buttons">
               <img src={beingxleanimg} alt="Workout" className="cta-image" />
             </div>
           </div>

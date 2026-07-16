@@ -285,36 +285,3 @@
 @media (max-width: 480px) {
   .stats-strip-inner { grid-template-columns: 1fr 1fr; }
 }
-
-
-
-
-.logo-glow-wrap {
-  position: relative;
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.logo-glow-wrap::before {
-  content: '';
-  position: absolute;
-  inset: -6px;
-  border-radius: 50%;
-  background: conic-gradient(from 0deg, transparent 0%, #ff8c00 15%, transparent 35%);
-  filter: blur(3px);
-  animation: logoRingSpin 3s linear infinite;
-  z-index: 0;
-}
-
-.logo-glow-wrap .logo-icon {
-  position: relative;
-  z-index: 1;
-  border-radius: 50%;
-}
-
-@keyframes logoRingSpin {
-  to { transform: rotate(360deg); }
-}
