@@ -77,7 +77,7 @@ export default function ReviewsSection() {
           {reviews.map((r, i) => (
             <div className="review-card reveal" key={i} style={{ animationDelay: `${i * 0.08}s` }}>
               <Stars value={r.rating} />
-              <p className="review-comment">"{r.comment}"</p>
+              <p className="review-comment">"{r.comment || 'Rated their experience with BEING_X_LEAN.'}"</p>
               <div className="review-meta">
                 <span className="review-name">{r.name}</span>
                 {r.plan && <span className="review-plan-tag">{r.plan === 'combo' ? 'Workout + Diet' : r.plan}</span>}
