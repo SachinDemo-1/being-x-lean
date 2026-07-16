@@ -28,7 +28,7 @@ export default function ReviewsSection() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchReviews(6)
+    fetchReviews(9)
       .then(data => {
         if (cancelled) return;
         if (data.reviews?.length) setReviews(data.reviews);
