@@ -295,15 +295,26 @@
 
 .lightbox-arrow {
   position: absolute; top: 50%; transform: translateY(-50%);
-  background: rgba(255,255,255,0.12);
+  background: linear-gradient(135deg, #ff8c00, #ff3d00);
   border: none; color: #fff;
   width: 50px; height: 50px;
   border-radius: 50%; font-size: 1.6rem;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: background 0.2s; z-index: 10;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 0 0 rgba(255, 90, 0, 0.5);
+  animation: arrowPulse 2s ease-in-out infinite;
+  z-index: 10;
 }
-.lightbox-arrow:hover { background: rgba(255,255,255,0.28); }
+.lightbox-arrow:hover {
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 0 20px rgba(255, 90, 0, 0.6);
+}
+
+@keyframes arrowPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 90, 0, 0.5); }
+  50%      { box-shadow: 0 0 14px 4px rgba(255, 90, 0, 0.35); }
+}
 .lightbox-prev { left: 16px; }
 .lightbox-next { right: 16px; }
 
