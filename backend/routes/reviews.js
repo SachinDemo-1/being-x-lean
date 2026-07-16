@@ -26,7 +26,7 @@ router.get('/', async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 20, 50);
     const [reviews, agg] = await Promise.all([
-      Review.find({ approved: true, comment: { $ne: '' } })
+      Review.find({ approved: true })
         .sort({ createdAt: -1 })
         .limit(limit)
         .select('name rating comment plan verifiedPurchase createdAt'),

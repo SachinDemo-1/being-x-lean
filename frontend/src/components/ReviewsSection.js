@@ -28,7 +28,7 @@ export default function ReviewsSection() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchReviews(9)
+    fetchReviews(6)
       .then(data => {
         if (cancelled) return;
         if (data.reviews?.length) setReviews(data.reviews);
@@ -75,7 +75,7 @@ export default function ReviewsSection() {
 
         <div className="reviews-grid">
           {reviews.map((r, i) => (
-            <div className="review-card reveal" key={i} style={{ animationDelay: `${i * 0.08}s` }}>
+            <div className="review-card" key={i}>
               <Stars value={r.rating} />
               <p className="review-comment">"{r.comment || 'Rated their experience with BEING_X_LEAN.'}"</p>
               <div className="review-meta">
@@ -86,7 +86,7 @@ export default function ReviewsSection() {
           ))}
         </div>
 
-        <div className="reviews-cta reveal">
+        <div className="reviews-cta">
           <button className="btn-outline" onClick={() => setShowPopup(true)}>✍️ Write a Review</button>
         </div>
       </div>
