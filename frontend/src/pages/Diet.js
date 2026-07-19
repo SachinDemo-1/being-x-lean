@@ -85,14 +85,14 @@ const TARGET_RANGES = {
 // so the solver only ever moves it in realistic increments (e.g. rice in
 // 50g jumps, roti as whole pieces).
 const FOODS = {
-  oats:         { name: 'Oats',                              per100: { cal: 389, p: 16.9, c: 66.3, f: 6.9 }, step: 10, min: 30,  max: 60,  unit: 'g' },
+  oats:         { name: 'Oats',                              per100: { cal: 389, p: 16.9, c: 66.3, f: 6.9 }, step: 10, min: 30,  max: 90,  unit: 'g' },
   milk:         { name: 'Milk',                               per100: { cal: 60,  p: 3.3,  c: 4.8,  f: 3.3 }, step: 50, min: 100, max: 350, unit: 'ml' },
   banana:       { name: 'Banana',        perUnit: { cal: 89,  p: 1.3,  c: 27,   f: 0.3 }, step: 1,  min: 1,  max: 2,   unit: 'medium', countable: true },
   almonds:      { name: 'Almonds',       perUnit: { cal: 6.9, p: 0.25, c: 0.26, f: 0.60 }, step: 5, min: 10,  max: 25,  unit: 'pcs',     countable: true },
 
   wheyProtein:  { name: 'Whey Protein',  perUnit: { cal: 118, p: 24,   c: 3,    f: 1.5 }, step: 1,  min: 1,  max: 2,   unit: 'scoop',   countable: true },
-  brownBread:   { name: 'Brown Bread',   perUnit: { cal: 70,  p: 3.5,  c: 12,   f: 1.1 }, step: 1,  min: 2,  max: 3,   unit: 'slice',   countable: true },
-  peanutButter: { name: 'Peanut Butter', perUnit: { cal: 96,  p: 4,    c: 3.2,  f: 8   }, step: 1,  min: 1,  max: 1,   unit: 'tbsp',    countable: true },
+  brownBread:   { name: 'Brown Bread',   perUnit: { cal: 70,  p: 3.5,  c: 12,   f: 1.1 }, step: 1,  min: 2,  max: 6,   unit: 'slice',   countable: true },
+  peanutButter: { name: 'Peanut Butter', perUnit: { cal: 96,  p: 4,    c: 3.2,  f: 8   }, step: 1,  min: 1,  max: 2,   unit: 'tbsp',    countable: true },
   boiledPotato: { name: 'Boiled Potato/Sweet Potato', per100: { cal: 87, p: 1.9, c: 20.1, f: 0.1 }, step: 50, min: 50, max: 350, unit: 'g' },
 
   rice:         { name: 'Rice',          per100: { cal: 130, p: 2.7,  c: 28.2, f: 0.3 }, step: 50, min: 150,  max: 400, unit: 'g' },
@@ -156,21 +156,46 @@ const MEAL_TEMPLATES = {
 };
 
 // ─── Non-Veg version — same meal slots/timing, protein sources swapped ────
-// Muscle Gain uses the exact meal structure requested. Evening Snack's eggs
-// are a FIXED quantity (not solved for) — everything else in the day still
-// adjusts around it to hit the calorie/macro targets.
+// Muscle Gain uses the exact meal structure requested, with per-food limits:
+//   Oats 30-50g · Almonds 10-15pc · Brown Bread 2-4pc · Peanut Butter 1tbsp (fixed)
+//   Rice 100-400g · Dal/Rajma 1 bowl (fixed) · Eggs 5 (fixed) · Mixed Veg 1 bowl (fixed)
+//   Dinner uses Roti (4-5pc) in place of Rice, with Rice noted as the alternate.
+// These are SLOT-LEVEL overrides (see parseSlotDef/slotBounds below) — they
+// only apply within this template and never touch the global FOODS min/max,
+// so the Veg Muscle Gain / Veg Fat Loss plans are completely unaffected.
 const MEAL_TEMPLATES_NONVEG = {
   muscle_gain: [
-    { name: 'Pre-Workout',   time: '7:00 AM',  icon: '🌅', slots: ['wheyProtein', 'oats', 'banana', 'almonds'] },
-    { name: 'Post-Workout',  time: '10:00 AM', icon: '💪', slots: ['chickenBreast','brownBread', 'peanutButter'] },
-    { name: 'Lunch',         time: '1:00 PM',  icon: '🍛', slots: ['rice', 'dalRajma', 'curd', 'salad'], notes: { rice: 'or Roti' } },
-    { name: 'Evening Snack', time: '5:00 PM',  icon: '🥚', slots: [{ key: 'eggs', amount: 4 }], notes: { eggs: 'Whole Eggs' } },
-    { name: 'Dinner',        time: '9:00 PM',  icon: '🍲', slots: ['chickenBreast', 'rice', 'mixedVeg', 'salad'], notes: { rice: 'or Roti' } },
+    { name: 'Pre-Workout',   time: '7:00 AM',  icon: '🌅', slots: [
+      'wheyProtein',
+      { key: 'oats', min: 30, max: 50 },
+      'banana',
+      { key: 'almonds', min: 10, max: 15 },
+    ] },
+    { name: 'Post-Workout',  time: '10:00 AM', icon: '💪', slots: [
+      'chickenBreast',
+      { key: 'brownBread', min: 2, max: 4 },
+      { key: 'peanutButter', amount: 1 },
+    ] },
+    { name: 'Lunch',         time: '1:00 PM',  icon: '🍛', slots: [
+      { key: 'rice', min: 100, max: 400 },
+      { key: 'dalRajma', amount: 1 },
+      'curd',
+      'salad',
+    ], notes: { rice: 'or Roti' } },
+    { name: 'Evening Snack', time: '5:00 PM',  icon: '🥚', slots: [
+      { key: 'eggs', amount: 5 },
+    ], notes: { eggs: 'Whole Eggs' } },
+    { name: 'Dinner',        time: '9:00 PM',  icon: '🍲', slots: [
+      'chickenBreast',
+      { key: 'roti', min: 4, max: 5 },
+      { key: 'mixedVeg', amount: 1 },
+      'salad',
+    ], notes: { roti: 'or Rice' } },
   ],
   fat_loss: [
     { name: 'Pre-Workout',   time: '6:30 AM',  icon: '🥣', slots: ['upmaPoha', 'curd'] },
     { name: 'Post-Workout',  time: '8:00 AM',  icon: '💪', slots: ['oats', 'wheyProtein', 'milk', 'banana'] },
-    { name: 'Lunch',         time: '1:00 PM',  icon: '🍛', slots: ['rice', 'chickenBreast', 'mixedVeg', 'eggs', 'salad'], notes: { rice: 'or(4-5) Roti' } },
+    { name: 'Lunch',         time: '1:00 PM',  icon: '🍛', slots: ['rice', 'chickenBreast', 'mixedVeg', 'eggs', 'salad'], notes: { rice: 'or Roti' } },
     { name: 'Evening Snack', time: '5:00 PM',  icon: '🥜', slots: ['eggs', 'curd'] },
     { name: 'Dinner',        time: '8:00 PM',  icon: '🍽️', slots: ['chickenBreast', 'rice', 'mixedVeg', 'salad'], notes: { rice: 'or Roti' } },
   ],
@@ -235,6 +260,37 @@ function errorScore(totals, target) {
   return dCal * dCal + dP * dP + dC * dC + dF * dF;
 }
 
+// A meal slot is normally just a food key (string), solved using that food's
+// global min/max/step from FOODS. It can ALSO be an object to customize just
+// THIS slot, without touching the food's global values used everywhere else:
+//   { key, amount }            → FIXED quantity, never adjusted by the solver
+//   { key, min, max, step? }   → solved normally, but within these custom
+//                                 bounds instead of the food's global ones
+function parseSlotDef(slotDef) {
+  if (typeof slotDef === 'string') {
+    return { key: slotDef, fixed: null, min: null, max: null, step: null };
+  }
+  const { key, amount, min, max, step } = slotDef;
+  return {
+    key,
+    fixed: amount != null ? amount : null,
+    min: min != null ? min : null,
+    max: max != null ? max : null,
+    step: step != null ? step : null,
+  };
+}
+
+// Resolves the effective min/max/step for a slot: its own override if given,
+// otherwise falls back to the food's global defaults in FOODS.
+function slotBounds(s) {
+  const food = FOODS[s.key];
+  return {
+    min: s.min != null ? s.min : food.min,
+    max: s.max != null ? s.max : food.max,
+    step: s.step != null ? s.step : food.step,
+  };
+}
+
 function solveMealPlan(goal, targetMacros, dietType = 'veg') {
   const templatesSource = dietType === 'nonveg' ? MEAL_TEMPLATES_NONVEG : MEAL_TEMPLATES;
   const template = templatesSource[goal] || templatesSource.muscle_gain;
@@ -243,24 +299,17 @@ function solveMealPlan(goal, targetMacros, dietType = 'veg') {
   // can adjust independently. Duplicate items across meals (e.g. Rice or
   // Mixed Vegetables appearing twice) are tracked separately per meal.
   //
-  // A slot can either be a plain food key (string) — solved normally — or
-  // an object { key, amount } for a FIXED quantity (e.g. "4 whole eggs")
-  // that always stays at that exact amount and is never nudged up/down;
-  // its macros still count toward the day's totals, everything else just
-  // adjusts around it.
+  // Each slot is either a plain food key (string) — solved normally with
+  // that food's global bounds — or an object using parseSlotDef() above for
+  // a FIXED quantity or CUSTOM min/max just for that one slot.
   const slots = [];
   template.forEach((meal, mi) => {
     meal.slots.forEach(slotDef => {
-      const isFixed = typeof slotDef === 'object' && slotDef !== null;
-      slots.push({
-        mealIdx: mi,
-        key: isFixed ? slotDef.key : slotDef,
-        fixed: isFixed ? slotDef.amount : null,
-      });
+      slots.push({ mealIdx: mi, ...parseSlotDef(slotDef) });
     });
   });
 
-  const qty = slots.map(s => (s.fixed != null ? s.fixed : FOODS[s.key].min));
+  const qty = slots.map(s => (s.fixed != null ? s.fixed : slotBounds(s).min));
 
   function totals() {
     let cal = 0, p = 0, c = 0, f = 0;
@@ -282,18 +331,19 @@ function solveMealPlan(goal, targetMacros, dietType = 'veg') {
     slots.forEach((s, i) => {
       if (s.fixed != null) return; // fixed quantity (e.g. eggs) — never adjusted
       const food = FOODS[s.key];
+      const b = slotBounds(s);
 
       // Try increasing this food by one realistic step.
-      if (qty[i] + food.step <= food.max) {
-        const d = computeFoodMacros(s.key, food.step);
+      if (qty[i] + b.step <= b.max) {
+        const d = computeFoodMacros(s.key, b.step);
         const trial = { cal: current.cal + d.cal, p: current.p + d.p, c: current.c + d.c, f: current.f + d.f };
         const score = errorScore(trial, targetMacros);
         if (score < bestScore) { bestScore = score; bestIdx = i; bestDir = 1; }
       }
 
       // Try decreasing this food by one realistic step.
-      if (qty[i] - food.step >= food.min) {
-        const d = computeFoodMacros(s.key, -food.step);
+      if (qty[i] - b.step >= b.min) {
+        const d = computeFoodMacros(s.key, -b.step);
         const trial = { cal: current.cal + d.cal, p: current.p + d.p, c: current.c + d.c, f: current.f + d.f };
         const score = errorScore(trial, targetMacros);
         if (score < bestScore) { bestScore = score; bestIdx = i; bestDir = -1; }
@@ -301,7 +351,7 @@ function solveMealPlan(goal, targetMacros, dietType = 'veg') {
     });
 
     if (bestIdx === -1) break; // no single step improves things further
-    qty[bestIdx] += bestDir * FOODS[slots[bestIdx].key].step;
+    qty[bestIdx] += bestDir * slotBounds(slots[bestIdx]).step;
     current = totals();
   }
 
