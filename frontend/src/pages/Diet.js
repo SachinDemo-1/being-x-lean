@@ -11,7 +11,7 @@ import { shouldShowReviewPopup, markPrompted } from '../context/reviews';
 
 // ─── Temporary toggle: set to true to disable Non-Veg selection (e.g. during
 // festival/holiday days). Flip back to false to re-enable it.
-const NONVEG_DISABLED = true;
+const NONVEG_DISABLED = false;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DIET CALCULATION ENGINE — v11 (FIXED MEAL STRUCTURE + MATH SOLVER)
