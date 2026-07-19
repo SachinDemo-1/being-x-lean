@@ -11,7 +11,7 @@ import { shouldShowReviewPopup, markPrompted } from '../context/reviews';
 
 // ─── Temporary toggle: set to true to disable Non-Veg selection (e.g. during
 // festival/holiday days). Flip back to false to re-enable it.
-const NONVEG_DISABLED = true;
+const NONVEG_DISABLED = false;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DIET CALCULATION ENGINE — v11 (FIXED MEAL STRUCTURE + MATH SOLVER)
@@ -110,6 +110,9 @@ const FOODS = {
   roastedChana: { name: 'Roasted Chana / Sprouted Moong Dal', per100: { cal: 340, p: 20, c: 55, f: 5 }, step: 10, min: 20, max: 100, unit: 'g' },
 
   mixedSeeds:   { name: 'Mixed Seeds',   per100: { cal: 550, p: 22,   c: 18,   f: 49  }, step: 5,  min: 0,   max: 30,  unit: 'g' },
+
+  chickenBreast: { name: 'Chicken Breast', per100: { cal: 165, p: 31,  c: 0,    f: 3.6 }, step: 50, min: 100, max: 250, unit: 'g' },
+  eggs:          { name: 'Eggs',           perUnit: { cal: 78, p: 6.3, c: 0.6,  f: 5.3 }, step: 1,  min: 2,  max: 6,   unit: 'pcs', countable: true },
 };
 
 function computeFoodMacros(key, amount) {
@@ -149,6 +152,24 @@ const MEAL_TEMPLATES = {
     { name: 'Lunch',         time: '1:00 PM',  icon: '🍛', slots: ['rice', 'dalRajma', 'mixedVeg', 'soyaChunks', 'salad'], notes: { rice: 'or Roti' } },
     { name: 'Evening Snack', time: '5:00 PM',  icon: '🥜', slots: ['roastedChana', 'curd'] },
     { name: 'Dinner',        time: '8:00 PM',  icon: '🍽️', slots: ['paneerTofu', 'rice', 'mixedVeg', 'salad'], notes: { paneerTofu: 'or Tofu', rice: 'or Roti' } },
+  ],
+};
+
+// ─── Non-Veg version — same meal slots/timing, protein sources swapped ────
+const MEAL_TEMPLATES_NONVEG = {
+  muscle_gain: [
+    { name: 'Pre-Workout',   time: '7:00 AM',  icon: '🌅', slots: ['oats', 'milk', 'banana', 'almonds'] },
+    { name: 'Post-Workout',  time: '10:00 AM', icon: '💪', slots: ['wheyProtein', 'brownBread', 'peanutButter', 'boiledPotato'] },
+    { name: 'Lunch',         time: '1:00 PM',  icon: '🍛', slots: ['rice', 'chickenBreast', 'mixedVeg', 'salad'], notes: { rice: 'or Roti' } },
+    { name: 'Evening Snack', time: '5:00 PM',  icon: '🥜', slots: ['eggs', 'curd'] },
+    { name: 'Dinner',        time: '9:00 PM',  icon: '🍲', slots: ['chickenBreast', 'roti', 'mixedVeg', 'salad'] },
+  ],
+  fat_loss: [
+    { name: 'Pre-Workout',   time: '6:30 AM',  icon: '🥣', slots: ['upmaPoha', 'curd'] },
+    { name: 'Post-Workout',  time: '8:00 AM',  icon: '💪', slots: ['oats', 'wheyProtein', 'milk', 'banana'] },
+    { name: 'Lunch',         time: '1:00 PM',  icon: '🍛', slots: ['rice', 'chickenBreast', 'mixedVeg', 'eggs', 'salad'], notes: { rice: 'or Roti' } },
+    { name: 'Evening Snack', time: '5:00 PM',  icon: '🥜', slots: ['eggs', 'curd'] },
+    { name: 'Dinner',        time: '8:00 PM',  icon: '🍽️', slots: ['chickenBreast', 'rice', 'mixedVeg', 'salad'], notes: { rice: 'or Roti' } },
   ],
 };
 
@@ -211,8 +232,9 @@ function errorScore(totals, target) {
   return dCal * dCal + dP * dP + dC * dC + dF * dF;
 }
 
-function solveMealPlan(goal, targetMacros) {
-  const template = MEAL_TEMPLATES[goal] || MEAL_TEMPLATES.muscle_gain;
+function solveMealPlan(goal, targetMacros, dietType = 'veg') {
+  const templatesSource = dietType === 'nonveg' ? MEAL_TEMPLATES_NONVEG : MEAL_TEMPLATES;
+  const template = templatesSource[goal] || templatesSource.muscle_gain;
 
   // Flatten every meal's slots into one list of {mealIdx, key} the solver
   // can adjust independently. Duplicate items across meals (e.g. Rice or
@@ -853,7 +875,7 @@ export default function Diet() {
       // target, then solve the FIXED meal structure's food quantities to
       // land within tolerance of all four numbers at once.
       const targetMacros = computeTargetMacros(goal, w, targetCalories);
-      const { meals: scaledMeals, actualTotals } = solveMealPlan(goal, targetMacros);
+      const { meals: scaledMeals, actualTotals } = solveMealPlan(goal, targetMacros, formData.dietType);
       const optionalMeals = resolveOptionalMeals(goal);
 
       const bracket = getBracket(w);
