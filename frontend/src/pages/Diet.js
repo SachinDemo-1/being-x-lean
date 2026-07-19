@@ -85,14 +85,14 @@ const TARGET_RANGES = {
 // so the solver only ever moves it in realistic increments (e.g. rice in
 // 50g jumps, roti as whole pieces).
 const FOODS = {
-  oats:         { name: 'Oats',                              per100: { cal: 389, p: 16.9, c: 66.3, f: 6.9 }, step: 10, min: 30,  max: 90,  unit: 'g' },
+  oats:         { name: 'Oats',                              per100: { cal: 389, p: 16.9, c: 66.3, f: 6.9 }, step: 10, min: 30,  max: 60,  unit: 'g' },
   milk:         { name: 'Milk',                               per100: { cal: 60,  p: 3.3,  c: 4.8,  f: 3.3 }, step: 50, min: 100, max: 350, unit: 'ml' },
   banana:       { name: 'Banana',        perUnit: { cal: 89,  p: 1.3,  c: 27,   f: 0.3 }, step: 1,  min: 1,  max: 2,   unit: 'medium', countable: true },
   almonds:      { name: 'Almonds',       perUnit: { cal: 6.9, p: 0.25, c: 0.26, f: 0.60 }, step: 5, min: 10,  max: 25,  unit: 'pcs',     countable: true },
 
   wheyProtein:  { name: 'Whey Protein',  perUnit: { cal: 118, p: 24,   c: 3,    f: 1.5 }, step: 1,  min: 1,  max: 2,   unit: 'scoop',   countable: true },
   brownBread:   { name: 'Brown Bread',   perUnit: { cal: 70,  p: 3.5,  c: 12,   f: 1.1 }, step: 1,  min: 2,  max: 6,   unit: 'slice',   countable: true },
-  peanutButter: { name: 'Peanut Butter', perUnit: { cal: 96,  p: 4,    c: 3.2,  f: 8   }, step: 1,  min: 1,  max: 2,   unit: 'tbsp',    countable: true },
+  peanutButter: { name: 'Peanut Butter', perUnit: { cal: 96,  p: 4,    c: 3.2,  f: 8   }, step: 1,  min: 1,  max: 1,   unit: 'tbsp',    countable: true },
   boiledPotato: { name: 'Boiled Potato/Sweet Potato', per100: { cal: 87, p: 1.9, c: 20.1, f: 0.1 }, step: 50, min: 50, max: 350, unit: 'g' },
 
   rice:         { name: 'Rice',          per100: { cal: 130, p: 2.7,  c: 28.2, f: 0.3 }, step: 50, min: 150,  max: 400, unit: 'g' },
@@ -162,7 +162,7 @@ const MEAL_TEMPLATES = {
 const MEAL_TEMPLATES_NONVEG = {
   muscle_gain: [
     { name: 'Pre-Workout',   time: '7:00 AM',  icon: '🌅', slots: ['wheyProtein', 'oats', 'banana', 'almonds'] },
-    { name: 'Post-Workout',  time: '10:00 AM', icon: '💪', slots: ['chickenBreast', 'peanutButter'] },
+    { name: 'Post-Workout',  time: '10:00 AM', icon: '💪', slots: ['chickenBreast','brownBread', 'peanutButter'] },
     { name: 'Lunch',         time: '1:00 PM',  icon: '🍛', slots: ['rice', 'dalRajma', 'curd', 'salad'], notes: { rice: 'or Roti' } },
     { name: 'Evening Snack', time: '5:00 PM',  icon: '🥚', slots: [{ key: 'eggs', amount: 4 }], notes: { eggs: 'Whole Eggs' } },
     { name: 'Dinner',        time: '9:00 PM',  icon: '🍲', slots: ['chickenBreast', 'rice', 'mixedVeg', 'salad'], notes: { rice: 'or Roti' } },
@@ -170,7 +170,7 @@ const MEAL_TEMPLATES_NONVEG = {
   fat_loss: [
     { name: 'Pre-Workout',   time: '6:30 AM',  icon: '🥣', slots: ['upmaPoha', 'curd'] },
     { name: 'Post-Workout',  time: '8:00 AM',  icon: '💪', slots: ['oats', 'wheyProtein', 'milk', 'banana'] },
-    { name: 'Lunch',         time: '1:00 PM',  icon: '🍛', slots: ['rice', 'chickenBreast', 'mixedVeg', 'eggs', 'salad'], notes: { rice: 'or Roti' } },
+    { name: 'Lunch',         time: '1:00 PM',  icon: '🍛', slots: ['rice', 'chickenBreast', 'mixedVeg', 'eggs', 'salad'], notes: { rice: 'or(4-5) Roti' } },
     { name: 'Evening Snack', time: '5:00 PM',  icon: '🥜', slots: ['eggs', 'curd'] },
     { name: 'Dinner',        time: '8:00 PM',  icon: '🍽️', slots: ['chickenBreast', 'rice', 'mixedVeg', 'salad'], notes: { rice: 'or Roti' } },
   ],
