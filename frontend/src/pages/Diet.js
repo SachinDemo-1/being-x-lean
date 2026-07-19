@@ -91,7 +91,7 @@ const FOODS = {
   almonds:      { name: 'Almonds',       perUnit: { cal: 6.9, p: 0.25, c: 0.26, f: 0.60 }, step: 5, min: 10,  max: 25,  unit: 'pcs',     countable: true },
 
   wheyProtein:  { name: 'Whey Protein',  perUnit: { cal: 118, p: 24,   c: 3,    f: 1.5 }, step: 1,  min: 1,  max: 2,   unit: 'scoop',   countable: true },
-  brownBread:   { name: 'Brown Bread',   perUnit: { cal: 70,  p: 3.5,  c: 12,   f: 1.1 }, step: 1,  min: 2,  max: 6,   unit: 'slice',   countable: true },
+  brownBread:   { name: 'Brown Bread',   perUnit: { cal: 70,  p: 3.5,  c: 12,   f: 1.1 }, step: 1,  min: 2,  max: 3,   unit: 'slice',   countable: true },
   peanutButter: { name: 'Peanut Butter', perUnit: { cal: 96,  p: 4,    c: 3.2,  f: 8   }, step: 1,  min: 1,  max: 1,   unit: 'tbsp',    countable: true },
   boiledPotato: { name: 'Boiled Potato/Sweet Potato', per100: { cal: 87, p: 1.9, c: 20.1, f: 0.1 }, step: 50, min: 50, max: 350, unit: 'g' },
 
