@@ -156,13 +156,16 @@ const MEAL_TEMPLATES = {
 };
 
 // ─── Non-Veg version — same meal slots/timing, protein sources swapped ────
+// Muscle Gain uses the exact meal structure requested. Evening Snack's eggs
+// are a FIXED quantity (not solved for) — everything else in the day still
+// adjusts around it to hit the calorie/macro targets.
 const MEAL_TEMPLATES_NONVEG = {
   muscle_gain: [
-    { name: 'Pre-Workout',   time: '7:00 AM',  icon: '🌅', slots: ['oats', 'milk', 'banana', 'almonds'] },
-    { name: 'Post-Workout',  time: '10:00 AM', icon: '💪', slots: ['wheyProtein', 'brownBread', 'peanutButter', 'boiledPotato'] },
-    { name: 'Lunch',         time: '1:00 PM',  icon: '🍛', slots: ['rice', 'chickenBreast', 'mixedVeg', 'salad'], notes: { rice: 'or Roti' } },
-    { name: 'Evening Snack', time: '5:00 PM',  icon: '🥜', slots: ['eggs', 'curd'] },
-    { name: 'Dinner',        time: '9:00 PM',  icon: '🍲', slots: ['chickenBreast', 'roti', 'mixedVeg', 'salad'] },
+    { name: 'Pre-Workout',   time: '7:00 AM',  icon: '🌅', slots: ['wheyProtein', 'oats', 'banana', 'almonds'] },
+    { name: 'Post-Workout',  time: '10:00 AM', icon: '💪', slots: ['chickenBreast', 'peanutButter'] },
+    { name: 'Lunch',         time: '1:00 PM',  icon: '🍛', slots: ['rice', 'dalRajma', 'curd', 'salad'], notes: { rice: 'or Roti' } },
+    { name: 'Evening Snack', time: '5:00 PM',  icon: '🥚', slots: [{ key: 'eggs', amount: 4 }], notes: { eggs: 'Whole Eggs' } },
+    { name: 'Dinner',        time: '9:00 PM',  icon: '🍲', slots: ['chickenBreast', 'rice', 'mixedVeg', 'salad'], notes: { rice: 'or Roti' } },
   ],
   fat_loss: [
     { name: 'Pre-Workout',   time: '6:30 AM',  icon: '🥣', slots: ['upmaPoha', 'curd'] },
@@ -239,12 +242,25 @@ function solveMealPlan(goal, targetMacros, dietType = 'veg') {
   // Flatten every meal's slots into one list of {mealIdx, key} the solver
   // can adjust independently. Duplicate items across meals (e.g. Rice or
   // Mixed Vegetables appearing twice) are tracked separately per meal.
+  //
+  // A slot can either be a plain food key (string) — solved normally — or
+  // an object { key, amount } for a FIXED quantity (e.g. "4 whole eggs")
+  // that always stays at that exact amount and is never nudged up/down;
+  // its macros still count toward the day's totals, everything else just
+  // adjusts around it.
   const slots = [];
   template.forEach((meal, mi) => {
-    meal.slots.forEach(key => slots.push({ mealIdx: mi, key }));
+    meal.slots.forEach(slotDef => {
+      const isFixed = typeof slotDef === 'object' && slotDef !== null;
+      slots.push({
+        mealIdx: mi,
+        key: isFixed ? slotDef.key : slotDef,
+        fixed: isFixed ? slotDef.amount : null,
+      });
+    });
   });
 
-  const qty = slots.map(s => FOODS[s.key].min);
+  const qty = slots.map(s => (s.fixed != null ? s.fixed : FOODS[s.key].min));
 
   function totals() {
     let cal = 0, p = 0, c = 0, f = 0;
@@ -264,6 +280,7 @@ function solveMealPlan(goal, targetMacros, dietType = 'veg') {
     let bestIdx = -1, bestDir = 0, bestScore = errorScore(current, targetMacros);
 
     slots.forEach((s, i) => {
+      if (s.fixed != null) return; // fixed quantity (e.g. eggs) — never adjusted
       const food = FOODS[s.key];
 
       // Try increasing this food by one realistic step.
